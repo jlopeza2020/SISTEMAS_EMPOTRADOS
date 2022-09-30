@@ -90,6 +90,7 @@ void *thread_routine(void *ptr){
                 warnx ("error in clock get time");
                 exit(EXIT_FAILURE);
             }
+            // used to check if it is sleeping correctly
             DEBUG_PRINTF("SLEEP: %ld\n",PERIOD-dif.tv_nsec);
         }
     }
