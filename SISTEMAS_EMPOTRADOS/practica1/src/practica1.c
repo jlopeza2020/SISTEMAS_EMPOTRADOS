@@ -10,14 +10,14 @@
     #define DEBUG_PRINTF(...)
 #endif
 
-
+#define SUCCESS 0
+#define FAILURE 1
 #define NTHREADS 4
 #define ITERATIONS 5
 #define S2NS 1000000000
 #define ZERO_DOT_NINETYFIVE_S 905000000
 #define PERIOD 900000000L
 #define ZERO_DOT_FIVE_S 398885000ULL
-
 
 void get_time(struct timespec *dif){
 
@@ -109,16 +109,16 @@ int main(int argc, char *argv[]){
     for (i = 0; i < NTHREADS; i++) {
         if (iret[i] = pthread_create(&thread[i], NULL, thread_routine, (void*) msgs[i]) != 0){
             warnx ("error creating thread");
-            return 1;
+            return FAILURE;
         }
     }
 
     for (i = 0; i < NTHREADS; i++) {
         if (pthread_join(thread[i], NULL) != 0){
             warnx ("error joining thread");
-            return 1;
+            return FAILURE;
         }
     }
 
-    return 0;
+    return SUCCESS;
 }
