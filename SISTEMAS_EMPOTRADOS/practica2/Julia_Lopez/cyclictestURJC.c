@@ -116,6 +116,10 @@ void *latency_calculation(void *ptr){
     
     char *message;
     struct timespec begin, end, dif, before_sleep;
+    int counter;
+    long total_latency;
+    long media_latency;
+    //long max_latency;
 
     message = (char *) ptr;
     
@@ -128,11 +132,14 @@ void *latency_calculation(void *ptr){
     
     dif.tv_sec = 0;
     dif.tv_nsec = 0;
+    counter = 0;
+    total_latency = 0;
+
     while(dif.tv_sec < 60){
 
         if (clock_gettime(CLOCK_MONOTONIC, &before_sleep) != 0){
-        warnx ("error in clock get time");
-        exit(EXIT_FAILURE);
+            warnx ("error in clock get time");
+            exit(EXIT_FAILURE);
         }
         sleep(1/1000);
         if (clock_gettime(CLOCK_MONOTONIC, &end) != 0){
@@ -141,17 +148,22 @@ void *latency_calculation(void *ptr){
         }
         //calculates the seconds to reach to the minute
         dif.tv_sec = end.tv_sec - begin.tv_sec - 1/1000;
-        
+
+        counter++;
         // here you get the planification latency 
         if(end.tv_nsec > before_sleep.tv_nsec){
             dif.tv_nsec = end.tv_nsec - before_sleep.tv_nsec;
         }else{
             dif.tv_nsec = before_sleep.tv_nsec - end.tv_nsec;
         }
-        DEBUG_PRINTF("nanosecs %ld\n",dif.tv_nsec);
+        total_latency = total_latency +  dif.tv_nsec;
+
+        media_latency = total_latency / counter;
+        //DEBUG_PRINTF("nanosecs %ld\n",dif.tv_nsec);
     }
 
-    printf("%s, dif = %ld\n", message, dif.tv_sec);
+
+    printf("%s, dif = %ld, latencia media = %ld\n", message, dif.tv_sec, media_latency);
     pthread_exit(NULL);
 }
 
