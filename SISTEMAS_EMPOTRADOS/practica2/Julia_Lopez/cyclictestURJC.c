@@ -1,4 +1,5 @@
 #include <err.h>
+#include <errno.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
@@ -16,7 +17,7 @@
 #define FAILURE 1
 #define MAX_NUM_OUTPUT 6 // include maximun of 999 + brackets + \0
 
-int errno;
+//nt errno;
 /*#define SUCCESS 0
 #define FAILURE 1
 #define NTHREADS 4
@@ -124,7 +125,7 @@ int main(int argc, char *argv[]){
 
     pthread_t thread[NCORES];
     char *msgs[NCORES];
-    char num_output[MAX_NUM_OUTPUT]; 
+    char *num_output; 
     int i;
     struct sched_param param;
     int policy = SCHED_FIFO;
@@ -134,50 +135,48 @@ int main(int argc, char *argv[]){
     // prepare thread configuration
     param.sched_priority = priority;
 
-    //s = pthread_setschedparam(thread[i], policy, &param);
-
-    //if (s != 0){
-      //  perror("Error in pthread_setschedparam");
-    //}
-
-    for (i = 0; i < NCORES; i++) {
+    /*for (i = 0; i < NCORES; i++){
     
         // maximum num of cores must be less than 999
-        //num_output = malloc(MAX_NUM_OUTPUT*sizeof(char));
+        num_output = malloc(MAX_NUM_OUTPUT*sizeof(char));
         sprintf(num_output, "[%d]", i);
         msgs[i] = num_output;
         DEBUG_PRINTF("STR IN ARR %s\n",msgs[i]);
-    }
+    }*/
 
     for (i = 0; i < NCORES; i++) {
+
+        num_output = malloc(MAX_NUM_OUTPUT*sizeof(char));
+        sprintf(num_output, "[%d]", i);
+        msgs[i] = num_output;
+        DEBUG_PRINTF("STR IN ARR %s\n",msgs[i]);
 
         if (pthread_create(&thread[i], NULL, latency_calculation, (void*) msgs[i]) != 0){
             perror("error creating thread");
-            return FAILURE;
         }
 
-        memset(&param, 0, sizeof(param));
+        // set configuration 
         config = pthread_setschedparam(thread[i], policy, &param);
-
         if (config != 0){
             perror("Error in pthread_setschedparam");
-            //free(msgs[i])
-
-            //exit(FAILURE);
         }
     }
 
-    // hacer free de los numeros de  dentro de msgs*
     for (i = 0; i < NCORES; i++) {
         if (pthread_join(thread[i], NULL) != 0){
             perror("error joining thread");
-            free(msgs[i]);
-            return FAILURE;
         }
-        // liberate the memory allocated by malloc 
-        //free(msgs[i]);
     }
 
-    DEBUG_PRINTF("ERRNO %s\n", strerror(errno));
-    return SUCCESS;
+    // liberate memory
+    for (i = 0; i < NCORES; i++){
+        free(msgs[i]); 
+    }
+
+    DEBUG_PRINTF("ERRNO %d\n", errno);
+    if (errno != 0){
+        return FAILURE;
+    }else{
+        return SUCCESS;
+    }
 }
