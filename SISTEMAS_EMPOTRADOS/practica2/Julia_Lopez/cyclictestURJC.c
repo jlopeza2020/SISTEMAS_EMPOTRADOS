@@ -7,8 +7,8 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <fcntl.h>
-#include <sys/stat.h> 
-#include <sys/types.h>
+//#include <sys/stat.h> 
+//#include <sys/types.h>
 
 #ifdef DEBUG
     #define DEBUG_PRINTF(...) printf("DEBUG: "__VA_ARGS__)
@@ -20,8 +20,9 @@
 #define FAILURE 1
 #define MAX_NUM_OUTPUT 6 // include maximun of 999 + brackets + \0
 #define PRIORITY 99
-#define MINUTE 2*60*398885000ULL
+//#define MINUTE 2*60*398885000ULL
 
+int latency_target_fd;
 //nt errno;
 /*#define SUCCESS 0
 #define FAILURE 1
@@ -110,10 +111,34 @@ void *thread_routine(void *ptr){
 
    pthread_exit(NULL);
 }*/
+void process_options(){
+
+    int policy = SCHED_FIFO;
+    struct sched_param param;
+    cpu_set_t cpuset;
+    int i, config, dif_core;
+
+    // prepare thread configuration
+    param.sched_priority = PRIORITY;
+
+    // set configuration 
+    config = pthread_setschedparam(pthread_self(), policy, &param);
+    if (config != 0){
+        perror("Error in pthread_setschedparam");
+    }
+
+    CPU_ZERO(&cpuset);
+    CPU_SET(i, &cpuset);
+
+    dif_core = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
+    if (dif_core != 0){
+        perror("Error in pthread_setaffinity_np");
+    }
+
+}
 
 void *latency_calculation(void *ptr){
 
-    
     char *message;
     struct timespec begin, end, dif, before_sleep, dif_latency;
     int counter;
@@ -123,70 +148,70 @@ void *latency_calculation(void *ptr){
 
     message = (char *) ptr;
     
-    // si hay  algun error hacer free de message
-
-    if (clock_gettime(CLOCK_MONOTONIC, &begin) != 0){
-        warnx ("error in clock get time");
-        exit(EXIT_FAILURE);
-    }
-    
     dif.tv_sec = 0;
     dif.tv_nsec = 0;
     counter = 0;
     total_latency = 0;
-    max_latency = 0;
     media_latency = 0;
+    max_latency  = 0;
+
+    if (clock_gettime(CLOCK_MONOTONIC, &begin) != 0){
+        perror("error in clock get time");
+        close(latency_target_fd);
+        exit(EXIT_FAILURE);
+    }
 
     while(dif.tv_sec < 60){
 
-        dif_latency.tv_sec = 0;
-        dif_latency.tv_nsec = 0;
-
         if (clock_gettime(CLOCK_MONOTONIC, &before_sleep) != 0){
-            warnx ("error in clock get time");
+            perror("error in clock get time");
+            close(latency_target_fd);
             exit(EXIT_FAILURE);
         }
         sleep(1/1000);
+       
         if (clock_gettime(CLOCK_MONOTONIC, &end) != 0){
-            warnx ("error in clock get time");
+            perror("error in clock get time");
+            close(latency_target_fd);
             exit(EXIT_FAILURE);
         }
         //calculates the seconds to reach to the minute
+    
         dif.tv_sec = end.tv_sec - begin.tv_sec - 1/1000;
 
-        counter++;
         // here you get the planification latency 
         if(end.tv_nsec > before_sleep.tv_nsec){
             dif_latency.tv_nsec = end.tv_nsec - before_sleep.tv_nsec;
+
         }else{
             dif_latency.tv_nsec = before_sleep.tv_nsec - end.tv_nsec;
+            DEBUG_PRINTF(" MESSAGE %s %ld = %ld - %ld  \n", message, dif_latency.tv_nsec, end.tv_nsec , before_sleep.tv_nsec);
+
         }
 
         total_latency = total_latency +  dif_latency.tv_nsec;
-        //media_latency = total_latency / counter;
 
+        DEBUG_PRINTF(" MESSAGE %s MAX LATENCY  %ld  DIF LATENCY %ld  \n", message,  max_latency, dif_latency.tv_nsec);
+
+        
+        //printf("maxima = %ld \n", max_latency);
         if (max_latency < dif_latency.tv_nsec){
             max_latency = dif_latency.tv_nsec;
         }
-        //DEBUG_PRINTF(" message %s  nano %ld media %ld max %ld\n", message,  dif_latency.tv_nsec, media_latency, max_latency);
-        DEBUG_PRINTF("message %s max latency %ld\n",message, max_latency);
-        DEBUG_PRINTF("nanosecs %ld\n",dif_latency.tv_nsec);
-    }
 
+        counter++;
+    }
+   
     media_latency = total_latency / counter;
 
-    //DEBUG_PRINTF(" message %s  nano %ld media %ld max %ld\n", message,  dif_latency.tv_nsec, media_latency, max_latency);
-
-    printf("%s, dif = %ld, latencia media =%ld, latencia maxima = %ld \n", message, dif.tv_sec, media_latency, max_latency);
+    printf("%s, dif = %ld, latencia media =%.9ld, latencia maxima = %.9ld \n", message, dif.tv_sec, media_latency, max_latency);
     pthread_exit(NULL);
 }
 
 // to config with the least latency 
-int set_latency_target(){
+void set_latency_target(){
 
     static int32_t latency_target_value = 0;
-    int latency_target_fd;
-
 
 	latency_target_fd = open("/dev/cpu_dma_latency", O_RDWR);
     if(latency_target_fd < 0){
@@ -200,10 +225,7 @@ int set_latency_target(){
         close(latency_target_fd);
         exit(FAILURE);
     }
-
-    return latency_target_fd;
 }
-
 
 int main(int argc, char *argv[]){
 
@@ -213,42 +235,21 @@ int main(int argc, char *argv[]){
     pthread_t thread[NCORES];
     char *msgs[NCORES];
     char *num_output; 
-    struct sched_param param;
-    int policy = SCHED_FIFO;
-    int i, config, dif_core;
-    cpu_set_t cpuset;
-    int latency_target_fd; 
+    int i; 
 
-    // prepare thread configuration
-    param.sched_priority = PRIORITY;
-
-    // if /dev/cpu_dma_latency exists we use it 
-    latency_target_fd = set_latency_target();
-
+    set_latency_target();
 
     for (i = 0; i < NCORES; i++) {
 
         num_output = malloc(MAX_NUM_OUTPUT*sizeof(char));
+        //memset(&num_output, '\0', sizeof(num_output));
         sprintf(num_output, "[%d]", i);
         msgs[i] = num_output;
 
         if (pthread_create(&thread[i], NULL, latency_calculation, (void*) msgs[i]) != 0){
             perror("error creating thread");
         }
-
-        // set configuration 
-        config = pthread_setschedparam(thread[i], policy, &param);
-        if (config != 0){
-            perror("Error in pthread_setschedparam");
-        }
-
-        CPU_ZERO(&cpuset);
-        CPU_SET(i, &cpuset);
-
-        dif_core = pthread_setaffinity_np(thread[i], sizeof(cpuset), &cpuset);
-        if (dif_core != 0){
-            perror("Error in pthread_setaffinity_np");
-        }
+        process_options();
     }
 
     for (i = 0; i < NCORES; i++) {
