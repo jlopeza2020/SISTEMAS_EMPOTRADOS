@@ -115,11 +115,11 @@ void *latency_calculation(void *ptr){
 
     
     char *message;
-    struct timespec begin, end, dif, before_sleep;
+    struct timespec begin, end, dif, before_sleep, dif_latency;
     int counter;
-    long total_latency;
-    long media_latency;
-    //long max_latency;
+    long int total_latency;
+    long int media_latency;
+    long int max_latency;
 
     message = (char *) ptr;
     
@@ -134,8 +134,13 @@ void *latency_calculation(void *ptr){
     dif.tv_nsec = 0;
     counter = 0;
     total_latency = 0;
+    max_latency = 0;
+    media_latency = 0;
 
     while(dif.tv_sec < 60){
+
+        dif_latency.tv_sec = 0;
+        dif_latency.tv_nsec = 0;
 
         if (clock_gettime(CLOCK_MONOTONIC, &before_sleep) != 0){
             warnx ("error in clock get time");
@@ -152,43 +157,50 @@ void *latency_calculation(void *ptr){
         counter++;
         // here you get the planification latency 
         if(end.tv_nsec > before_sleep.tv_nsec){
-            dif.tv_nsec = end.tv_nsec - before_sleep.tv_nsec;
+            dif_latency.tv_nsec = end.tv_nsec - before_sleep.tv_nsec;
         }else{
-            dif.tv_nsec = before_sleep.tv_nsec - end.tv_nsec;
+            dif_latency.tv_nsec = before_sleep.tv_nsec - end.tv_nsec;
         }
-        total_latency = total_latency +  dif.tv_nsec;
 
-        media_latency = total_latency / counter;
-        //DEBUG_PRINTF("nanosecs %ld\n",dif.tv_nsec);
+        total_latency = total_latency +  dif_latency.tv_nsec;
+        //media_latency = total_latency / counter;
+
+        if (max_latency < dif_latency.tv_nsec){
+            max_latency = dif_latency.tv_nsec;
+        }
+        //DEBUG_PRINTF(" message %s  nano %ld media %ld max %ld\n", message,  dif_latency.tv_nsec, media_latency, max_latency);
+        DEBUG_PRINTF("message %s max latency %ld\n",message, max_latency);
+        DEBUG_PRINTF("nanosecs %ld\n",dif_latency.tv_nsec);
     }
 
+    media_latency = total_latency / counter;
 
-    printf("%s, dif = %ld, latencia media = %ld\n", message, dif.tv_sec, media_latency);
+    //DEBUG_PRINTF(" message %s  nano %ld media %ld max %ld\n", message,  dif_latency.tv_nsec, media_latency, max_latency);
+
+    printf("%s, dif = %ld, latencia media =%ld, latencia maxima = %ld \n", message, dif.tv_sec, media_latency, max_latency);
     pthread_exit(NULL);
 }
 
 // to config with the least latency 
 int set_latency_target(){
 
-	struct stat s;
     static int32_t latency_target_value = 0;
     int latency_target_fd;
 
 
-	if (stat("/dev/cpu_dma_latency", &s) == 0) {
-		latency_target_fd = open("/dev/cpu_dma_latency", O_RDWR);
-        if(latency_target_fd < 0){
-            perror("error in open");
-            close(latency_target_fd);
-            exit(FAILURE);
-        }
+	latency_target_fd = open("/dev/cpu_dma_latency", O_RDWR);
+    if(latency_target_fd < 0){
+        perror("error in open");
+        close(latency_target_fd);
+        exit(FAILURE);
+    }
 
-        if(write(latency_target_fd, &latency_target_value, 4) == -1){
-            perror("error in write");
-            close(latency_target_fd);
-            exit(FAILURE);
-        }
-	}
+    if(write(latency_target_fd, &latency_target_value, 4) == -1){
+        perror("error in write");
+        close(latency_target_fd);
+        exit(FAILURE);
+    }
+
     return latency_target_fd;
 }
 
