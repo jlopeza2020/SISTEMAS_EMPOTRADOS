@@ -20,97 +20,18 @@
 #define FAILURE 1
 #define MAX_NUM_OUTPUT 6 // include maximun of 999 + brackets + \0
 #define PRIORITY 99
+//#define NCORES (int) sysconf(_SC_NPROCESSORS_ONLN)
 //#define MINUTE 2*60*398885000ULL
 
+struct latency_values{
+
+    char msgs[MAX_NUM_OUTPUT];
+    int counter;
+    long media_latency;
+    long max_latency;
+};
+
 int latency_target_fd;
-//nt errno;
-/*#define SUCCESS 0
-#define FAILURE 1
-#define NTHREADS 4
-#define ITERATIONS 5
-#define S2NS 1000000000
-#define ZERO_DOT_NINETYFIVE_S 905000000
-#define PERIOD 900000000L
-#define ZERO_DOT_FIVE_S 398885000ULL
-
-void get_time(struct timespec *dif){
-
-    struct timespec begin, end;
-    volatile unsigned long long j;
-    
-    if (clock_gettime(CLOCK_MONOTONIC, &begin) != 0){
-        warnx ("error in clock get time");
-        exit(EXIT_FAILURE);
-    }
-
-    // I had to modify since 400000000ULL did not represent 0.5 seconds
-    for (j=0; j < ZERO_DOT_FIVE_S ; j++); 
-
-    if (clock_gettime(CLOCK_MONOTONIC, &end) != 0){
-        warnx ("error in clock get time");
-        exit(EXIT_FAILURE);
-    }
-
-    // subtract seconds
-    if(end.tv_sec < begin.tv_sec){
-        dif->tv_sec = begin.tv_sec - end.tv_sec;
-    }else{
-        dif->tv_sec = end.tv_sec - begin.tv_sec; 
-    }
-
-    //This is because the begin time is bigger than 5*10^8 ns and so,
-    //  seconds in the end time is 1 value bigger 
-    if (dif->tv_sec == 1){
-        dif->tv_sec = dif->tv_sec - 1;
-    }
-
-    // subtract nanoseconds
-    if(end.tv_nsec  < begin.tv_nsec){
-        dif->tv_nsec = begin.tv_nsec - end.tv_nsec;
-    }else{
-        dif->tv_nsec = end.tv_nsec - begin.tv_nsec;
-    }
-}
-
-void *thread_routine(void *ptr){
-
-    struct timespec begin_realt, dif;
-    volatile unsigned long long j;
-    char *message;
-    int i;
-    double cost;
-
-    message = (char *) ptr;
-
-    for (i=1; i <= ITERATIONS; i++){ 
-
-        if (clock_gettime(CLOCK_REALTIME, &begin_realt) != 0){
-            warnx ("error in clock get time");
-            exit(EXIT_FAILURE);
-        }
-
-        get_time(&dif);
-
-        cost = (double)dif.tv_sec + (double)dif.tv_nsec / S2NS;
-
-        // round the function 
-        if (dif.tv_sec > 0 || dif.tv_nsec > ZERO_DOT_NINETYFIVE_S){
-            printf("[%ld.%ld] %s - Iteración %d : Coste=%.2f s (fallo temporal)\n", 
-                    begin_realt.tv_sec, begin_realt.tv_nsec, message, i, cost);
-        }else{
-            printf("[%ld.%ld] %s - Iteración %d : Coste=%.2f s\n", 
-                    begin_realt.tv_sec, begin_realt.tv_nsec, message, i, cost);
-            if (nanosleep((const struct timespec[]){{dif.tv_sec, PERIOD-dif.tv_nsec}}, NULL) < 0){
-                warnx ("error in clock get time");
-                exit(EXIT_FAILURE);
-            }
-            // used to check if it is sleeping correctly
-            DEBUG_PRINTF("SLEEP: %ld\n",PERIOD-dif.tv_nsec);
-        }
-    }
-
-   pthread_exit(NULL);
-}*/
 void process_options(){
 
     int policy = SCHED_FIFO;
@@ -139,6 +60,7 @@ void process_options(){
 
 void *latency_calculation(void *ptr){
 
+    struct latency_values *values;
     char *message;
     struct timespec begin, end, dif, before_sleep, dif_latency;
     int counter;
@@ -146,14 +68,19 @@ void *latency_calculation(void *ptr){
     long int media_latency;
     long int max_latency;
 
-    message = (char *) ptr;
-    
+    //message = (char *) ptr;
+    values = (struct latency_values *) ptr;
+
+    //printf("myy pointer %s\n", values->msgs);
+    message  = values->msgs;
     dif.tv_sec = 0;
     dif.tv_nsec = 0;
     counter = 0;
     total_latency = 0;
     media_latency = 0;
     max_latency  = 0;
+
+    process_options();
 
     if (clock_gettime(CLOCK_MONOTONIC, &begin) != 0){
         perror("error in clock get time");
@@ -168,7 +95,10 @@ void *latency_calculation(void *ptr){
             close(latency_target_fd);
             exit(EXIT_FAILURE);
         }
-        sleep(1/1000);
+        if (nanosleep((const struct timespec[]){{0, 1000000}}, NULL) < 0){
+            perror("error in nanosleep");
+            exit(EXIT_FAILURE);
+        }
        
         if (clock_gettime(CLOCK_MONOTONIC, &end) != 0){
             perror("error in clock get time");
@@ -185,16 +115,10 @@ void *latency_calculation(void *ptr){
 
         }else{
             dif_latency.tv_nsec = before_sleep.tv_nsec - end.tv_nsec;
-            DEBUG_PRINTF(" MESSAGE %s %ld = %ld - %ld  \n", message, dif_latency.tv_nsec, end.tv_nsec , before_sleep.tv_nsec);
-
         }
 
         total_latency = total_latency +  dif_latency.tv_nsec;
 
-        DEBUG_PRINTF(" MESSAGE %s MAX LATENCY  %ld  DIF LATENCY %ld  \n", message,  max_latency, dif_latency.tv_nsec);
-
-        
-        //printf("maxima = %ld \n", max_latency);
         if (max_latency < dif_latency.tv_nsec){
             max_latency = dif_latency.tv_nsec;
         }
@@ -204,7 +128,13 @@ void *latency_calculation(void *ptr){
    
     media_latency = total_latency / counter;
 
-    printf("%s, dif = %ld, latencia media =%.9ld, latencia maxima = %.9ld \n", message, dif.tv_sec, media_latency, max_latency);
+    values->counter = counter;
+    values->media_latency = media_latency;
+    values->max_latency = max_latency;
+
+    printf("%s  latencia media = %.9ld ns. | max = %.9ld ns \n",
+             message, media_latency, max_latency);
+
     pthread_exit(NULL);
 }
 
@@ -233,31 +163,55 @@ int main(int argc, char *argv[]){
     DEBUG_PRINTF("N CORES %d\n",NCORES);
 
     pthread_t thread[NCORES];
-    char *msgs[NCORES];
-    char *num_output; 
-    int i; 
+    //char *msgs[NCORES];
+    char num_output[MAX_NUM_OUTPUT]; 
+    int i, j; 
+    struct latency_values threads_latency_values[NCORES];
+
+    long media_latency;
+    long final_media_latency;
+    long max_latency;
+    long final_max_latency;
+
+    media_latency = 0;
+    max_latency = 0;
 
     set_latency_target();
 
     for (i = 0; i < NCORES; i++) {
 
-        num_output = malloc(MAX_NUM_OUTPUT*sizeof(char));
+        //num_output = malloc(MAX_NUM_OUTPUT*sizeof(char));
         //memset(&num_output, '\0', sizeof(num_output));
         sprintf(num_output, "[%d]", i);
-        msgs[i] = num_output;
+        for (j = 0; j < MAX_NUM_OUTPUT; j++){
+            threads_latency_values[i].msgs[j] = num_output[j];
+        }
+        //printf("outttt %s\n", threads_latency_values[i].msgs);
+        memset(&num_output, '\0', sizeof(num_output));
+        //threads_latency_values[i].msgs = num_output;
 
-        if (pthread_create(&thread[i], NULL, latency_calculation, (void*) msgs[i]) != 0){
+        if (pthread_create(&thread[i], NULL, latency_calculation, (void*) &threads_latency_values[i]) != 0){
             perror("error creating thread");
         }
-        process_options();
     }
 
     for (i = 0; i < NCORES; i++) {
         if (pthread_join(thread[i], NULL) != 0){
             perror("error joining thread");
         }
-        free(msgs[i]);
+        //free(msgs[i]);
+        //free(threads_latency_values[i].msgs);
     }
+
+    for (i = 0; i < NCORES; i++) {
+        media_latency = media_latency + threads_latency_values[i].media_latency;
+        max_latency = max_latency + threads_latency_values[i].max_latency;
+    }
+
+    final_media_latency = media_latency / NCORES;
+    final_max_latency = max_latency / NCORES;
+
+    printf(" Total latencia media = %.9ld ns. | max = %.9ld ns \n", final_media_latency, final_max_latency);
 
     close(latency_target_fd);
     DEBUG_PRINTF("ERRNO %d\n", errno);
