@@ -21,6 +21,7 @@
 #define MILI_SECS 1000000
 #define SECONDS 0
 #define MAX_LATENCIES 10000
+#define LONG_SIZE 12
 
 struct latency_values{
 
@@ -32,6 +33,52 @@ struct latency_values{
 };
 
 int latency_target_fd;
+
+void write_error( int csv_fd){
+    perror("error in fd of csv file");
+    close(csv_fd);
+    close(latency_target_fd);
+    exit(FAILURE);
+}
+/*void csv_creation(char *msgs, long latencies_val, int ncores){
+    char iters[MAX_NUM_OUTPUT];
+    char latencies[LONG_SIZE];
+
+    int i, j, csv_fd;
+    csv_fd = open ("./cyclictestURJC.csv" , O_WRONLY | O_CREAT | O_TRUNC, 0666);
+
+    if( csv_fd < 0){
+        perror("error in fd of csv file");
+    }
+
+    for( i = 0; i < ncores; i++){
+        
+        for(j = 0; j < MAX_LATENCIES; j++){
+
+            if(write(csv_fd,msgs,MAX_NUM_OUTPUT) != MAX_NUM_OUTPUT){
+                write_error(csv_fd);
+            }
+            if(write(csv_fd,",",1) != 1){
+                write_error(csv_fd);
+            }
+            sprintf(iters, "%d", j);
+            if(write(csv_fd, iters, 6) != 6){
+                write_error(csv_fd);
+            }
+            if(write(csv_fd,",",1) != 1){
+                write_error(csv_fd);
+            }
+            sprintf(latencies, "%ld", latencies_val);
+            if(write(csv_fd, latencies, LONG_SIZE) != LONG_SIZE){
+                write_error(csv_fd);
+            }
+            if(write(csv_fd,"\n",2) != 2){
+                write_error(csv_fd);
+            }
+        }
+    }
+    close(csv_fd);
+}*/
 void process_options(pthread_t thread){
 
     int policy = SCHED_FIFO;
@@ -48,6 +95,8 @@ void process_options(pthread_t thread){
     config = pthread_setschedparam(thread, policy, &param);
     if (config != 0){
         perror("Error in pthread_setschedparam");
+        close(latency_target_fd);
+        exit(FAILURE);
     }
 
     CPU_ZERO(&cpuset);
@@ -56,6 +105,8 @@ void process_options(pthread_t thread){
     dif_core = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
     if (dif_core != 0){
         perror("Error in pthread_setaffinity_np");
+        close(latency_target_fd);
+        exit(FAILURE);
     }
 
 }
@@ -122,7 +173,6 @@ void *latency_calculation(void *ptr){
         }else{
             dif_latency.tv_nsec = before_sleep.tv_nsec - end.tv_nsec;
         }
-        //printf("latency %ld\n", dif_latency.tv_nsec);
 
         if (counter < MAX_LATENCIES){
             values->latencies[counter] = dif_latency.tv_nsec;
@@ -137,10 +187,12 @@ void *latency_calculation(void *ptr){
    
     media_latency = total_latency / counter;
 
-    //return 10000 not aprox 60000 
-    values->counter = MAX_LATENCIES;
-    //values->counter = counter;
-    //printf("counter %d\n", counter);
+    // i make this to avoid big arrays
+    if(counter < MAX_LATENCIES){
+        values->counter = counter;
+    }else{
+        values->counter = MAX_LATENCIES;
+    }
     values->media_latency = media_latency;
     values->max_latency = max_latency;
 
@@ -177,7 +229,7 @@ int main(int argc, char *argv[]){
     pthread_t thread[NCORES];
     char num_output[MAX_NUM_OUTPUT]; 
     char iters[MAX_NUM_OUTPUT];
-    char latencies[12];
+    char latencies[LONG_SIZE];
     int i, j; 
     struct latency_values threads_latency_values[NCORES];
 
@@ -228,62 +280,42 @@ int main(int argc, char *argv[]){
 
     printf(" Total latencia media = %.9ld ns. | max = %.9ld ns \n",
          final_media_latency, final_max_latency);
-
-    //create csv file 
-    //---work with it 
+    
     csv_fd = open ("./cyclictestURJC.csv" , O_WRONLY | O_CREAT | O_TRUNC, 0666);
 
     if( csv_fd < 0){
         perror("error in fd of csv file");
     }
 
-    for( i = 0; i < NCORES; i++){
-        
+    for( i = 0; i < NCORES; i++){  
         for(j = 0; j < MAX_LATENCIES; j++){
 
-            if(write(csv_fd,threads_latency_values[i].msgs,MAX_NUM_OUTPUT) != MAX_NUM_OUTPUT){
-                perror("error in fd of csv file");
-                close(csv_fd);
-                close(latency_target_fd);
-                exit(FAILURE);
+            sprintf(num_output, "%s", threads_latency_values[i].msgs);
+            if(write(csv_fd,num_output,strlen(num_output)) 
+            != strlen(num_output)){
+                write_error(csv_fd);
             }
             if(write(csv_fd,",",1) != 1){
-                perror("error in fd of csv file");
-                close(csv_fd);
-                close(latency_target_fd);
-                exit(FAILURE);
+                write_error(csv_fd);
             }
             sprintf(iters, "%d", j);
-            if(write(csv_fd, iters, 6) != 6){
-                perror("error in fd of csv file");
-                close(csv_fd);
-                close(latency_target_fd);
-                exit(FAILURE);
+            if(write(csv_fd, iters, strlen(iters)) != strlen(iters)){
+                write_error(csv_fd);
             }
             if(write(csv_fd,",",1) != 1){
-                perror("error in fd of csv file");
-                close(csv_fd);
-                close(latency_target_fd);
-                exit(FAILURE);
+                write_error(csv_fd);
             }
             sprintf(latencies, "%ld",threads_latency_values[i].latencies[j]);
-            if(write(csv_fd, latencies, 12) != 12){
-                perror("error in fd of csv file");
-                close(csv_fd);
-                close(latency_target_fd);
-                exit(FAILURE);
+            if(write(csv_fd, latencies, strlen(latencies)) != strlen(latencies)){
+                write_error(csv_fd);
             }
             if(write(csv_fd,"\n",2) != 2){
-                perror("error in fd of csv file");
-                close(csv_fd);
-                close(latency_target_fd);
-                exit(FAILURE);
+               write_error(csv_fd);
             }
         }
     }
     close(csv_fd);
 
-    //----
     close(latency_target_fd);
     DEBUG_PRINTF("ERRNO %d\n", errno);
     if (errno != 0){
