@@ -1,30 +1,49 @@
-#include <DHT.h>
-#include <DHT_U.h>
-
-
+/*#include <DHT.h>
+#include <DHT_U.h>*/
 
 #include <LiquidCrystal.h>
+#include "LedThread.h"
 
 #define DHTTYPE DHT11   // DHT 11
 
-int DHT11_PIN = 13;
-int LED_PIN1 = 10;// red
-int LED_PIN2 = 5; // green 
-int TRIGGER_PIN = 8;
-int ECHO_PIN = 7;
+#define DHT11_PIN 13
+#define LED_PIN1 10// red
+#define LED_PIN2 5 // green 
+#define TRIGGER_PIN 8
+#define ECHO_PIN 7
 int X;				// variable para almacenar valor leido del eje X
 int Y;				// variable para almacenar valor leido del eje y
-int PULSADOR = 9;		// pulsador incorporado pin digital 10
+#define PULSADOR 9		// pulsador incorporado pin digital 9
 int SW;				// variable para almacenar valor leido del pulsador
 float distancia;
 
-LiquidCrystal lcd(12, 11, 6, 4, 3, 2);
-DHT dht(DHT11_PIN, DHTTYPE);
+//lcd structure
+#define BOTON 1;
+#define RS 12
+#define ENABLE 11
+#define D0 6 
+#define D1 4
+#define D2 3 
+#define D3 2
+#define LCD_COLS 16
+#define LCD_ROWS 2
 
+LiquidCrystal lcd(RS, ENABLE, D0, D1, D2, D3);
+//DHT dht(DHT11_PIN, DHTTYPE);
+ThreadController controller = ThreadController();
+
+int counter = 0;
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
 
+  // First object LedThread with interval of 0.5 seconds
+  LedThread* ledThread = new LedThread(LED_PIN1);
+  ledThread->setInterval(500);
+  controller.add(ledThread); // add thread to the controller
+
+  
+  
   //pinMode(LED_PIN1, OUTPUT);
   //pinMode(LED_PIN2, OUTPUT);
   //pinMode(TRIGGER_PIN, OUTPUT);
@@ -32,20 +51,33 @@ void setup() {
   //pinMode(PULSADOR, INPUT);		// pulsador como entrada
 
   //set up the LCD's number of columns and rows
-  //lcd.begin(16,2);
+  lcd.begin(LCD_COLS,LCD_ROWS);
   // Print a message to the LCD 
-  //lcd.print("hello, world! my love");
+  lcd.print("   CARGANDO ...");
+  
+
+  //lcd.print("   Servicio");
   //delay(1000);
 
 
   //dht.begin();
 
-
-
 }
 
 
 void loop() {
+
+  if (counter < 3){
+    controller.run(); // call controller each iteration
+    Serial.println(counter);
+    counter++;
+  }else{
+    remove(ledThread) //- Removes the thread from the controller
+  }
+
+  
+
+
   //X = analogRead(A0);			// lectura de valor de eje x
   //Y = analogRead(A1);			// lectura de valor de eje y
   //SW = digitalRead(PULSADOR);		// lectura de valor de pulsador
@@ -118,10 +150,6 @@ void loop() {
   lcd.print("%");
   delay(1000);*/
 
-  int sensorValue = analogRead(A4);
-  // convert Analog2digital
-  float voltage = sensorValue * (5.0 / 1023.0);
-  Serial.println(voltage);
 }
 
 
