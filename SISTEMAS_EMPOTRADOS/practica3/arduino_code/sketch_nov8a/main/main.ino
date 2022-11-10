@@ -1,20 +1,19 @@
-/*#include <DHT.h>
-#include <DHT_U.h>*/
+#include <DHT.h>
+#include <DHT_U.h>
 
+#include <TimerOne.h>
 #include <LiquidCrystal.h>
-#include "LedThread.h"
 
 #define DHTTYPE DHT11   // DHT 11
-
 #define DHT11_PIN 13
 #define LED_PIN1 10// red
 #define LED_PIN2 5 // green 
 #define TRIGGER_PIN 8
 #define ECHO_PIN 7
-int X;				// variable para almacenar valor leido del eje X
-int Y;				// variable para almacenar valor leido del eje y
-#define PULSADOR 9		// pulsador incorporado pin digital 9
-int SW;				// variable para almacenar valor leido del pulsador
+int X;        // variable para almacenar valor leido del eje X
+int Y;        // variable para almacenar valor leido del eje y
+#define PULSADOR 9    // pulsador incorporado pin digital 9
+int SW;       // variable para almacenar valor leido del pulsador
 float distancia;
 
 //lcd structure
@@ -29,84 +28,20 @@ float distancia;
 #define LCD_ROWS 2
 
 LiquidCrystal lcd(RS, ENABLE, D0, D1, D2, D3);
-//DHT dht(DHT11_PIN, DHTTYPE);
-ThreadController controller = ThreadController();
+DHT dht(DHT11_PIN, DHTTYPE);
+//ThreadController controller = ThreadController();
 
-int counter = 0;
-void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(9600);
+bool start_state = false;
+bool service_state = false;
+bool admin_state = false;
 
-  // First object LedThread with interval of 0.5 seconds
-  LedThread* ledThread = new LedThread(LED_PIN1);
-  ledThread->setInterval(500);
-  controller.add(ledThread); // add thread to the controller
+int ledstate = LOW;
+int counter_led1 = 0;
+//int distance_sensor = 0;
 
-  
-  
-  //pinMode(LED_PIN1, OUTPUT);
-  //pinMode(LED_PIN2, OUTPUT);
-  //pinMode(TRIGGER_PIN, OUTPUT);
-  //pinMode(ECHO_PIN, INPUT);
-  //pinMode(PULSADOR, INPUT);		// pulsador como entrada
-
-  //set up the LCD's number of columns and rows
-  lcd.begin(LCD_COLS,LCD_ROWS);
-  // Print a message to the LCD 
-  lcd.print("   CARGANDO ...");
-  
-
-  //lcd.print("   Servicio");
-  //delay(1000);
-
-
-  //dht.begin();
-
-}
-
-
-void loop() {
-
-  if (counter < 3){
-    controller.run(); // call controller each iteration
-    Serial.println(counter);
-    counter++;
-  }else{
-    remove(ledThread) //- Removes the thread from the controller
-  }
-
-  
-
-
-  //X = analogRead(A0);			// lectura de valor de eje x
-  //Y = analogRead(A1);			// lectura de valor de eje y
-  //SW = digitalRead(PULSADOR);		// lectura de valor de pulsador
-
-  //digitalWrite(TRIGGER_PIN, HIGH);
-  //delayMicroseconds(10);
-  //digitalWrite(TRIGGER_PIN, LOW);
-  //distancia=pulseIn(ECHO_PIN, HIGH);
-  //Serial.println(distancia);
-  //Serial.println(X);
-  //Serial.println(Y);
-  //Serial.println(SW);
-  
-
-  //analogWrite(LED_PIN2, 50);
-  //delay(1000);
-  //scroll 13 positions (string legth) to the left
-  // to move it ofscreen left
-  
-  /*for( int positionCounter = 0; positionCounter < 13; positionCounter++){
-    lcd.scrollDisplayLeft();
-
-    //wait a bit
-    delay(150);
-  }*/
-
-
-  /*// Wait a few seconds between measurements.
-  delay(2000);
+void show_temp_hum(){
+  // Wait a few seconds between measurements.
+  delay(2000); // fix this
 
   // Reading temperature or humidity takes about 250 milliseconds!
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
@@ -148,8 +83,92 @@ void loop() {
   lcd.print("Humidity: ");
   lcd.print(h);
   lcd.print("%");
-  delay(1000);*/
-
+  delay(1000);
+  
 }
+//return distance in cm
+int get_distance(){
+
+  float time;
+  float distance;
+  digitalWrite(TRIGGER_PIN, HIGH);
+  delayMicroseconds(10); //fix this
+  digitalWrite(TRIGGER_PIN, LOW);
+  time=pulseIn(ECHO_PIN, HIGH);
+  
+  Serial.println(time);  
+
+  //distance = ((time * 0.3432) / 2);
+  distance = time / 29 / 2; // I do not know why 
+
+  Serial.println(distance);
+  return distance;
+}
+
+void blinkLED() {
+  
+  counter_led1++;
+  ledstate = !ledstate;
+}
+
+void setup() {
+  //config pins
+  pinMode(LED_PIN1, OUTPUT);
+  pinMode(TRIGGER_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  lcd.begin(LCD_COLS,LCD_ROWS);
+
+  // make sure led is off
+  digitalWrite(LED_PIN1, LOW);
+
+  //start interruption
+  Timer1.initialize(500000);
+  Timer1.attachInterrupt(blinkLED);
+  start_state = true;
+  Serial.begin(9600);
+
+  dht.begin();
+}
+
+void loop() {
+
+  if (start_state){
+    if(counter_led1 < 8){
+      // for the lcd not move letters
+      lcd.setCursor(3,0);
+      lcd.print("CARGANDO...");
+      digitalWrite(LED_PIN1, ledstate);
+    }else if (counter_led1 == 8 ){
+      lcd.clear();
+
+    }else if (counter_led1 == 9 || counter_led1 == 10 || counter_led1 == 11 ){
+      lcd.setCursor(3,0);
+      lcd.print("Servicio");
+    }else{
+      lcd.clear();
+      service_state = true;
+      start_state = false;
+    }      
+  }
+
+  if(service_state){
+
+    int distance_sensor = 0;
+
+    distance_sensor = get_distance();
+    if (0 < distance_sensor && distance_sensor < 100){
+      show_temp_hum();
+      Serial.println("I AM CLOSE");
+    }else{
+      lcd.clear();
+      lcd.setCursor(3,0);
+      lcd.print("ESPERANDO");
+      lcd.setCursor(4,1);
+      lcd.print("CLIENTE");
+    }
+  }
+}
+
 
 
