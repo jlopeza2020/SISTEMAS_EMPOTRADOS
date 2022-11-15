@@ -1,8 +1,8 @@
 #include <TimerOne.h>
 
-//#include <StaticThreadController.h>
-//#include <Thread.h>
-//#include <ThreadController.h>
+#include <StaticThreadController.h>
+#include <Thread.h>
+#include <ThreadController.h>
 
 /*#include <DHT.h>
 #include <DHT_U.h>*/

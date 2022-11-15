@@ -3,7 +3,7 @@
 #include <ThreadController.h>
 
 
-class LedThread: public Thread {
+class HumThread: public Thread {
 
 public:
 	int pin;

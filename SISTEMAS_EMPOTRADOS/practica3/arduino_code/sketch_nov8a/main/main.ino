@@ -1,3 +1,7 @@
+#include <StaticThreadController.h>
+#include <Thread.h>
+#include <ThreadController.h>
+
 #include <DHT.h>
 #include <DHT_U.h>
 
@@ -29,11 +33,15 @@ float distancia;
 
 LiquidCrystal lcd(RS, ENABLE, D0, D1, D2, D3);
 DHT dht(DHT11_PIN, DHTTYPE);
-//ThreadController controller = ThreadController();
+
+// threads 
+ThreadController controller = ThreadController();
+Thread distanceThread = Thread();
 
 bool start_state = false;
 bool service_state = false;
 bool admin_state = false;
+bool detected_person = false;
 
 int ledstate = LOW;
 int counter_led1 = 0;
@@ -45,46 +53,51 @@ void show_temp_hum(){
 
   // Reading temperature or humidity takes about 250 milliseconds!
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-  float h = dht.readHumidity();
-  // Read temperature as Celsius (the default)
-  float t = dht.readTemperature();
-  // Read temperature as Fahrenheit (isFahrenheit = true)
-  float f = dht.readTemperature(true);
+  float hum = dht.readHumidity();
+  // Read temperature as Celsius
+  float temp = dht.readTemperature();
 
-  // Check if any reads failed and exit early (to try again).
-  if (isnan(h) || isnan(t) || isnan(f)) {
-    Serial.println(F("Failed to read from DHT sensor!"));
+  // Check if any read failes
+  if (isnan(hum) || isnan(temp)) {
+    Serial.println(F("Failed reading from DHT sensor!"));
     return;
   }
 
-  // Compute heat index in Fahrenheit (the default)
-  float hif = dht.computeHeatIndex(f, h);
-  // Compute heat index in Celsius (isFahreheit = false)
-  float hic = dht.computeHeatIndex(t, h, false);
-
   Serial.print(F(" Humidity: "));
-  Serial.print(h);
+  Serial.print(hum);
   Serial.print(F("%  Temperature: "));
-  Serial.print(t);
-  Serial.print(F("C "));
-  Serial.print(f);
-  Serial.print(F("F  Heat index: "));
-  Serial.print(hic);
-  Serial.print(F("C "));
-  Serial.print(hif);
-  Serial.println(F("F"));
-
+  Serial.print(temp);
+  Serial.print(F("ºC "));
+  
   lcd.setCursor(0,0); 
   lcd.print("Temp: ");
-  lcd.print(t);
+  lcd.print(temp);
   lcd.print((char)223);
   lcd.print("C");
   lcd.setCursor(0,1);
   lcd.print("Humidity: ");
-  lcd.print(h);
+  lcd.print(hum);
   lcd.print("%");
   delay(1000);
   
+}
+void callback_dist_thread(){
+
+  int distance_sensor = 0;
+  distance_sensor = get_distance();
+  if (0 < distance_sensor && distance_sensor < 100){
+    controller.remove(&distanceThread);
+    //detected_person = true;
+    //show_temp_hum(); // durante 5 segundos 
+    //Serial.println("I AM CLOSE");
+      
+  }else{
+    lcd.clear();
+    lcd.setCursor(3,0);
+    lcd.print("ESPERANDO");
+    lcd.setCursor(4,1);
+    lcd.print("CLIENTE");
+  }  
 }
 //return distance in cm
 int get_distance(){
@@ -96,11 +109,8 @@ int get_distance(){
   digitalWrite(TRIGGER_PIN, LOW);
   time=pulseIn(ECHO_PIN, HIGH);
   
-  Serial.println(time);  
-
-  //distance = ((time * 0.3432) / 2);
-  distance = time / 29 / 2; // I do not know why 
-
+  //Serial.println(time);  
+  distance = time / 29 / 2; 
   Serial.println(distance);
   return distance;
 }
@@ -126,8 +136,16 @@ void setup() {
   Timer1.initialize(500000);
   Timer1.attachInterrupt(blinkLED);
   start_state = true;
-  Serial.begin(9600);
 
+  // threads section 
+  //Thread distanceThread = Thread();
+  distanceThread.enabled = true;
+  distanceThread.setInterval(300);
+  distanceThread.onRun(callback_dist_thread);
+
+  controller.add(&distanceThread);
+
+  Serial.begin(9600);
   dht.begin();
 }
 
@@ -140,6 +158,8 @@ void loop() {
       lcd.print("CARGANDO...");
       digitalWrite(LED_PIN1, ledstate);
     }else if (counter_led1 == 8 ){
+      // this interruption we won't use it again so I disable it
+      detachInterrupt(digitalPinToInterrupt(LED_PIN1));
       lcd.clear();
 
     }else if (counter_led1 == 9 || counter_led1 == 10 || counter_led1 == 11 ){
@@ -155,18 +175,26 @@ void loop() {
   if(service_state){
 
     int distance_sensor = 0;
+    controller.run();
 
-    distance_sensor = get_distance();
-    if (0 < distance_sensor && distance_sensor < 100){
-      show_temp_hum();
-      Serial.println("I AM CLOSE");
-    }else{
-      lcd.clear();
-      lcd.setCursor(3,0);
-      lcd.print("ESPERANDO");
-      lcd.setCursor(4,1);
-      lcd.print("CLIENTE");
-    }
+    //if(detected_person == false){
+      
+      //distance_sensor = get_distance();
+      //if (0 < distance_sensor && distance_sensor < 100){
+      //  detected_person = true;
+      
+      //}else{
+      //  lcd.clear();
+      //  lcd.setCursor(3,0);
+      //  lcd.print("ESPERANDO");
+      //  lcd.setCursor(4,1);
+      //  lcd.print("CLIENTE");
+      //}
+
+    //}else{
+      //show_temp_hum(); // durante 5 segundos 
+      //Serial.println("I AM CLOSE");
+    //}
   }
 }
 
