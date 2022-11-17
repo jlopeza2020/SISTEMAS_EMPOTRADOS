@@ -2,6 +2,7 @@
 #include <Thread.h>
 #include <ThreadController.h>
 
+#include <Adafruit_Sensor.h>
 #include <DHT.h>
 #include <DHT_U.h>
 
@@ -37,6 +38,7 @@ DHT dht(DHT11_PIN, DHTTYPE);
 // threads 
 ThreadController controller = ThreadController();
 Thread distanceThread = Thread();
+Thread  hum_tempThread = Thread();
 
 bool start_state = false;
 bool service_state = false;
@@ -45,14 +47,39 @@ bool detected_person = false;
 
 int ledstate = LOW;
 int counter_led1 = 0;
-//int distance_sensor = 0;
+int counter_t_h = 0;
 
-void show_temp_hum(){
-  // Wait a few seconds between measurements.
-  delay(2000); // fix this
 
-  // Reading temperature or humidity takes about 250 milliseconds!
-  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
+String coffees[] = {"Cafe solo", "Cafe Cortado", "Cafe Doble", "Cafe Premium", "Chocolate"};
+float prices[] = {1, 1.10, 1.25, 1.50, 2.00};
+
+byte euro_symbol[8] = {
+  0b00110,
+  0b01001,
+  0b01000,
+  0b11110,
+  0b11110,
+  0b01000,
+  0b01001,
+  0b00110
+};
+
+
+void show_products(){
+
+  //lcd.clear();
+
+  lcd.createChar(0, euro_symbol); // create a new custom character
+  lcd.setCursor(2, 0); // move cursor to (2, 0)
+  lcd.write((byte)0);  // print the custom char at (2, 0)
+}
+
+
+void show_t_h(){
+
+  counter_t_h++;
+}
+void callback_hum_dist_thread(){
   float hum = dht.readHumidity();
   // Read temperature as Celsius
   float temp = dht.readTemperature();
@@ -63,11 +90,11 @@ void show_temp_hum(){
     return;
   }
 
-  Serial.print(F(" Humidity: "));
-  Serial.print(hum);
-  Serial.print(F("%  Temperature: "));
-  Serial.print(temp);
-  Serial.print(F("ºC "));
+  //Serial.print(F(" Humidity: "));
+  //Serial.print(hum);
+  //Serial.print(F("%  Temperature: "));
+  //Serial.print(temp);
+  //Serial.print(F("ºC "));
   
   lcd.setCursor(0,0); 
   lcd.print("Temp: ");
@@ -78,38 +105,35 @@ void show_temp_hum(){
   lcd.print("Humidity: ");
   lcd.print(hum);
   lcd.print("%");
-  delay(1000);
-  
 }
+
 void callback_dist_thread(){
 
   int distance_sensor = 0;
+
   distance_sensor = get_distance();
   if (0 < distance_sensor && distance_sensor < 100){
-    controller.remove(&distanceThread);
-    //detected_person = true;
-    //show_temp_hum(); // durante 5 segundos 
-    //Serial.println("I AM CLOSE");
-      
+    detected_person = true;  
   }else{
     lcd.clear();
     lcd.setCursor(3,0);
     lcd.print("ESPERANDO");
     lcd.setCursor(4,1);
     lcd.print("CLIENTE");
-  }  
+  }
+
 }
+
 //return distance in cm
 int get_distance(){
 
   float time;
   float distance;
   digitalWrite(TRIGGER_PIN, HIGH);
-  delayMicroseconds(10); //fix this
+  delayMicroseconds(10);
   digitalWrite(TRIGGER_PIN, LOW);
   time=pulseIn(ECHO_PIN, HIGH);
   
-  //Serial.println(time);  
   distance = time / 29 / 2; 
   Serial.println(distance);
   return distance;
@@ -133,17 +157,21 @@ void setup() {
   digitalWrite(LED_PIN1, LOW);
 
   //start interruption
+  // 500 milis 
   Timer1.initialize(500000);
   Timer1.attachInterrupt(blinkLED);
   start_state = true;
 
-  // threads section 
-  //Thread distanceThread = Thread();
+  // THREADS SECTION 
+  // distance thread
   distanceThread.enabled = true;
   distanceThread.setInterval(300);
   distanceThread.onRun(callback_dist_thread);
 
-  controller.add(&distanceThread);
+  //hum thread 
+  hum_tempThread.enabled = true;
+  hum_tempThread.setInterval(250);
+  hum_tempThread.onRun(callback_hum_dist_thread);
 
   Serial.begin(9600);
   dht.begin();
@@ -175,27 +203,31 @@ void loop() {
   if(service_state){
 
     int distance_sensor = 0;
-    controller.run();
+    controller.add(&distanceThread);
 
-    //if(detected_person == false){
-      
-      //distance_sensor = get_distance();
-      //if (0 < distance_sensor && distance_sensor < 100){
-      //  detected_person = true;
-      
-      //}else{
-      //  lcd.clear();
-      //  lcd.setCursor(3,0);
-      //  lcd.print("ESPERANDO");
-      //  lcd.setCursor(4,1);
-      //  lcd.print("CLIENTE");
-      //}
+    // show durante 5 segundos 
+    if(detected_person){
+      controller.remove(&distanceThread);
+      //one second
+      Timer1.setPeriod(1000000);
+      Timer1.attachInterrupt(show_t_h);
+      //controller.remove(&distanceThread);
+      if(counter_t_h < 5){
+ 
+        callback_hum_dist_thread();
+      }else if(counter_t_h == 5){
+        lcd.clear();
 
-    //}else{
-      //show_temp_hum(); // durante 5 segundos 
-      //Serial.println("I AM CLOSE");
-    //}
+      }else{
+        detachInterrupt(digitalPinToInterrupt(DHT11_PIN));
+        show_products();
+      }
+    }
   }
+
+  //controller.add(&hum_tempThread); // better use in admin mode
+
+  controller.run();
 }
 
 
