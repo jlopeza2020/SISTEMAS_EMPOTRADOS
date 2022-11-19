@@ -184,7 +184,7 @@ int get_distance(){
   time=pulseIn(ECHO_PIN, HIGH);
   
   distance = time / 29 / 2; 
-  Serial.println(distance);
+  //Serial.println(distance);
   return distance;
 }
 
@@ -286,7 +286,7 @@ void loop() {
   
       if(phase_one){
         if ((millis() - prev_time2) > random_num*1000){
-          Serial.println(millis() - prev_time2);
+          //Serial.println(millis() - prev_time2);
           lcd.setCursor(3,0);
           lcd.print("Preparando");
           lcd.setCursor(4,1);
@@ -303,7 +303,7 @@ void loop() {
       if(phase_two){
 
         if ((millis() - prev_time2) > 3000){
-          Serial.println(millis() - prev_time2);
+          //Serial.println(millis() - prev_time2);
           lcd.setCursor(4,0);
           lcd.print("RETIRE");
           lcd.setCursor(4,1);
@@ -315,9 +315,9 @@ void loop() {
           lcd.clear();
           phase_two = false;
           prev_time2 = 0;
-
+          //meter watchdog para reiniciar hasta la fun servicio 
         }
-      } 
+      }
     }
   }
   controller.run();
