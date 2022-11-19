@@ -54,13 +54,18 @@ bool admin_state = false;
 bool detected_person = false;
 bool is_pressed = false;
 bool prepare_coffee = false;
+bool phase_one = false;
+bool phase_two = false;
 
 int ledstate = LOW;
 int counter_led1 = 0;
 int counter_t_h = 0;
 int now_state_y = 0;
 int arr_pos = 0;
+int coffee_time = 0;
+int random_num = 0;
 unsigned long int prev_time;
+unsigned long int prev_time2;
 
 
 String coffees[] = {"Cafe solo", "Cafe Cortado", "Cafe Doble", "Cafe Premium", "Chocolate"};
@@ -79,7 +84,9 @@ byte euro_symbol[8] = {
   0b00110
 };
 
-
+void preparing_coffee(){
+  coffee_time++;
+}
 void show_products(){
 
   now_state_y = analogRead(Y_AXIS);
@@ -111,27 +118,14 @@ void show_products(){
     if (joy_button == 0){
       //is_pressed = true;
       lcd.clear();
+      random_num = random(4,9); // from 4 to 8
       prepare_coffee = true;
+      phase_one= true;
     }
   
     prev_time = millis();
 
   }
-
-  /*lcd.setCursor(0, 0);
-  lcd.print(coffees[arr_pos]);
-  lcd.setCursor(0, 1); 
-  lcd.print(prices[arr_pos]);
-  // print €
-  lcd.write(3);
-
-  //manage joystick button
-  unsigned int joy_button = digitalRead(SW_BUTTON);
-  if (joy_button == 0){
-    //is_pressed = true;
-    lcd.clear();
-    prepare_coffee = true;
-  }*/
 }
 
 
@@ -151,19 +145,13 @@ void callback_hum_dist_thread(){
     return;
   }
 
-  //Serial.print(F(" Humidity: "));
-  //Serial.print(hum);
-  //Serial.print(F("%  Temperature: "));
-  //Serial.print(temp);
-  //Serial.print(F("ºC "));
-  
   lcd.setCursor(0,0); 
   lcd.print("Temp: ");
   lcd.print(temp);
   lcd.print((char)223);
   lcd.print("C");
   lcd.setCursor(0,1);
-  lcd.print("Humidity: ");
+  lcd.print("Humedad: ");
   lcd.print(hum);
   lcd.print("%");
 }
@@ -224,6 +212,8 @@ void setup() {
   // 500 milis 
   Timer1.initialize(500000);
   Timer1.attachInterrupt(blinkLED);
+
+  //Timer0.initialize(1000000);
   start_state = true;
 
   // THREADS SECTION 
@@ -241,6 +231,7 @@ void setup() {
   dht.begin();
   // create custom € symbol
   lcd.createChar(3, euro_symbol);
+  //random_num = random(4,9); // from 4 to 8
 }
 
 void loop() {
@@ -277,7 +268,6 @@ void loop() {
       //one second
       Timer1.setPeriod(1000000);
       Timer1.attachInterrupt(show_t_h);
-      //controller.remove(&distanceThread);
       if(counter_t_h < 5){
  
         callback_hum_dist_thread();
@@ -293,16 +283,43 @@ void loop() {
       }
     }
     if(prepare_coffee){
-      lcd.setCursor(3,0);
-      lcd.print("Preparando");
-      lcd.setCursor(4,1);
-      lcd.print("Cafe ..."); 
-      delay(1000);
-      prepare_coffee = false;
-      lcd.clear();
+  
+      if(phase_one){
+        if ((millis() - prev_time2) > random_num*1000){
+          Serial.println(millis() - prev_time2);
+          lcd.setCursor(3,0);
+          lcd.print("Preparando");
+          lcd.setCursor(4,1);
+          lcd.print("Cafe ...");
+          //treat led2 
+          prev_time2 = millis();
+        }else if ((millis() - prev_time2) ==  random_num*1000){
+          lcd.clear();
+          phase_one = false;
+          phase_two = true;
+          prev_time2 = 0;
+        }
+      }
+      if(phase_two){
+
+        if ((millis() - prev_time2) > 3000){
+          Serial.println(millis() - prev_time2);
+          lcd.setCursor(4,0);
+          lcd.print("RETIRE");
+          lcd.setCursor(4,1);
+          lcd.print("BEBIDA");
+          prev_time2 = millis();
+          //treat led2
+
+        }else if ((millis() - prev_time2) ==  3000){
+          lcd.clear();
+          phase_two = false;
+          prev_time2 = 0;
+
+        }
+      } 
     }
   }
-
   controller.run();
 }
 
