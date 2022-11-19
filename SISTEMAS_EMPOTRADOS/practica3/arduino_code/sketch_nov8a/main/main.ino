@@ -9,23 +9,23 @@
 #include <TimerOne.h>
 #include <LiquidCrystal.h>
 
-
-#define DHTTYPE DHT11   // DHT 11 sensor 
+// DHT 11 sensor 
+#define DHTTYPE DHT11  
 #define DHT11_PIN 13
 
-#define LED_PIN1 10// red
-#define LED_PIN2 5 // green 
+// red led
+#define LED_PIN1 10
+// green
+#define LED_PIN2 5 
 
 //ultrasonic sensor 
 #define TRIGGER_PIN 8
 #define ECHO_PIN 7
 
 //Joystick 
-#define X_AXIS A1        // variable para almacenar valor leido del eje X (joystick)
-#define Y_AXIS A0     // variable para almacenar valor leido del eje y (joystick)
-#define SW_BUTTON 9    // pulsador incorporado del joystic (añadir resistencia)
-//#define int SW;       // variable para almacenar valor leido del pulsador
-
+#define X_AXIS A1       
+#define Y_AXIS A0     
+#define SW_BUTTON 9 
 
 #define BUTTON 1; 
 
@@ -47,24 +47,26 @@ ThreadController controller = ThreadController();
 Thread distanceThread = Thread();
 Thread  hum_tempThread = Thread();
 
+//global vars
 bool start_state = false;
 bool service_state = false;
 bool admin_state = false;
 bool detected_person = false;
+bool is_pressed = false;
+bool prepare_coffee = false;
 
 int ledstate = LOW;
 int counter_led1 = 0;
 int counter_t_h = 0;
 int now_state_y = 0;
 int arr_pos = 0;
+unsigned long int prev_time;
+
 
 String coffees[] = {"Cafe solo", "Cafe Cortado", "Cafe Doble", "Cafe Premium", "Chocolate"};
 float prices[] = {1, 1.10, 1.25, 1.50, 2.00};
 float distancia;
 
-
-int prev_time;
-int times;
 
 byte euro_symbol[8] = {
   0b00110,
@@ -82,33 +84,54 @@ void show_products(){
 
   now_state_y = analogRead(Y_AXIS);
 
-  if ((millis() - prev_time) > 250){
+  if ((millis() - prev_time) > 150){
 
-    
     if (now_state_y < 100){
       if(arr_pos > 0){
         arr_pos--;
         lcd.clear();
-        Serial.println(arr_pos);
       }
     }
     if (now_state_y > 900){
       if(arr_pos < 4){
         arr_pos++;
-        Serial.println(arr_pos);
         lcd.clear();
       }
     }
+
+    lcd.setCursor(0, 0);
+    lcd.print(coffees[arr_pos]);
+    lcd.setCursor(0, 1); 
+    lcd.print(prices[arr_pos]);
+    // print €
+    lcd.write(3);
+
+    //manage joystick button
+    unsigned int joy_button = digitalRead(SW_BUTTON);
+    if (joy_button == 0){
+      //is_pressed = true;
+      lcd.clear();
+      prepare_coffee = true;
+    }
+  
     prev_time = millis();
+
   }
 
-  lcd.setCursor(0, 0);
+  /*lcd.setCursor(0, 0);
   lcd.print(coffees[arr_pos]);
   lcd.setCursor(0, 1); 
   lcd.print(prices[arr_pos]);
   // print €
   lcd.write(3);
 
+  //manage joystick button
+  unsigned int joy_button = digitalRead(SW_BUTTON);
+  if (joy_button == 0){
+    //is_pressed = true;
+    lcd.clear();
+    prepare_coffee = true;
+  }*/
 }
 
 
@@ -263,12 +286,22 @@ void loop() {
 
       }else{
         detachInterrupt(digitalPinToInterrupt(DHT11_PIN));
-        show_products(); // time to implement joystick
+        if(prepare_coffee != true){
+          show_products();          
+        }
+        
       }
     }
+    if(prepare_coffee){
+      lcd.setCursor(3,0);
+      lcd.print("Preparando");
+      lcd.setCursor(4,1);
+      lcd.print("Cafe ..."); 
+      delay(1000);
+      prepare_coffee = false;
+      lcd.clear();
+    }
   }
-
-  //controller.add(&hum_tempThread); // better use in admin mode
 
   controller.run();
 }
