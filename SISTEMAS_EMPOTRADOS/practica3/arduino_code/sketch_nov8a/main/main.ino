@@ -60,13 +60,12 @@ bool phase_two = false;
 int ledstate = LOW;
 int counter_led1, counter_t_h, now_state_y, arr_pos, coffee_time, random_num, led_value;
 unsigned long int prev_time;
-unsigned long int prev_time2 = 0;
+unsigned long int prev_time2;
 unsigned long int prev_time3;
 unsigned long int now;
 unsigned long int now2;
 unsigned long int dif;
 unsigned long int dif2;
-unsigned long int out;
 
 
 
@@ -170,7 +169,6 @@ void callback_dist_thread(){
   int distance_sensor = 0;
 
   distance_sensor = get_distance();
-  //Serial.println(distance_sensor);
   if (0 < distance_sensor && distance_sensor < 100){
     Serial.println("dentro");
     detected_person = true;
@@ -224,7 +222,6 @@ void setup() {
   Timer1.initialize(500000);
   Timer1.attachInterrupt(blinkLED);
 
-  //Timer0.initialize(1000000);
   start_state = true;
 
   // THREADS SECTION 
@@ -305,7 +302,6 @@ void loop() {
       if(phase_one){ 
                
         now = millis();
-        //Serial.println(dif) ;
 
         dif += (now - prev_time2);      
         if(dif < random_num*10){          
@@ -328,11 +324,10 @@ void loop() {
           dif = 0;
         }
         prev_time2 = millis();
-        
+
       }
       if(phase_two){
         
-        //analogWrite(LED_PIN2, 0);
         now2 = millis();
         Serial.println(dif) ;
 
@@ -342,15 +337,12 @@ void loop() {
           lcd.print("RETIRE");
           lcd.setCursor(4,1);
           lcd.print("BEBIDA");
-          //prev_time3 = millis();
 
         }else{
           lcd.clear();
           phase_two = false;
-          //prev_time3 = 0;
           detected_person = false;
           dif2 = 0;
-          //counter_t_h = 0;
 
         }
         prev_time3 = millis();
@@ -358,9 +350,6 @@ void loop() {
       }
     }
   }
-  //Serial.println(counter_t_h);
-  //añadir admin state
-
   controller.run();
 }
 
