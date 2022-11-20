@@ -46,6 +46,7 @@ DHT dht(DHT11_PIN, DHTTYPE);
 ThreadController controller = ThreadController();
 Thread distanceThread = Thread();
 Thread  hum_tempThread = Thread();
+Thread shine_led = Thread();
 
 //global vars
 bool start_state = false;
@@ -64,6 +65,9 @@ int now_state_y = 0;
 int arr_pos = 0;
 int coffee_time = 0;
 int random_num = 0;
+int led_value = 0;
+int i = 0;
+//unsigned long int time;
 unsigned long int prev_time;
 unsigned long int prev_time2;
 
@@ -83,6 +87,12 @@ byte euro_symbol[8] = {
   0b01001,
   0b00110
 };
+
+void callback_led_shine(){
+  led_value += 255/random_num;
+  Serial.println(led_value);
+  analogWrite(LED_PIN2, led_value);  
+}
 
 void preparing_coffee(){
   coffee_time++;
@@ -207,6 +217,7 @@ void setup() {
 
   // make sure led is off
   digitalWrite(LED_PIN1, LOW);
+  analogWrite(LED_PIN1, 0);
 
   //start interruption
   // 500 milis 
@@ -226,6 +237,11 @@ void setup() {
   hum_tempThread.enabled = true;
   hum_tempThread.setInterval(250);
   hum_tempThread.onRun(callback_hum_dist_thread);
+
+  //shine led
+  shine_led.enabled = true;
+  shine_led.setInterval(1000);
+  shine_led.onRun(callback_led_shine);
 
   Serial.begin(9600);
   dht.begin();
@@ -283,25 +299,75 @@ void loop() {
       }
     }
     if(prepare_coffee){
-  
-      if(phase_one){
-        if ((millis() - prev_time2) > random_num*1000){
-          //Serial.println(millis() - prev_time2);
+      
+      if(phase_one){ 
+        //i = (millis() - prev_time2);
+        //Serial.println(i);
+        
+        /*if ( i == 990 || i == 991 || i == 992 || i == 993 || i == 994 || i == 995 || i == 996 || i == 997 || i == 998 || i == 999){
+          led_value += 255/random_num;
+        }else if ( i == 1990 || i == 1991 || i == 1992 || i == 1993 || i == 1994 || i == 1995 || i == 1996 || i == 1997 || i == 1998 || i == 1999){
+          led_value += 255/random_num;
+        }else if ( i == 2990 || i == 2991 || i == 2992 || i == 2993 || i == 2994 || i == 2995 || i == 2996 || i == 2997 || i == 2998 || i == 2999){
+          led_value += 255/random_num;
+        }else if (  i == 3990 || i == 3991 || i == 3992 || i == 3993 || i == 3994 || i == 3995 || i == 3996 || i == 3997 || i == 3998 || i == 3999 ){
+          led_value += 255/random_num;
+        }else if( i == 4990 || i == 4991 || i == 4992 || i == 4993 || i == 4994 || i == 4995 || i == 4996 || i == 4997 || i == 4998 || i == 4999){
+          led_value += 255/random_num;
+        }else if ( i == 5990 || i == 5991 || i == 5992 || i == 5993 || i == 5994 || i == 5995 || i == 5996 || i == 5997 || i == 5998 || i == 5999 ){
+          led_value += 255/random_num;
+        }else if (  i == 6990 || i == 6991 || i == 6992 || i == 6993 || i == 6994 || i == 6995 || i == 6996 || i == 6997 || i == 6998 || i == 6999){
+          led_value += 255/random_num;
+        }else if ( i == 7990 || i == 7991 || i == 7992 || i == 7993 || i == 7994 || i == 7995 || i == 7996 || i == 7997 || i == 7998 || i == 7999){
+          led_value += 255/random_num;
+        }*/
+
+        
+        //Serial.println(led_value);
+        //analogWrite(LED_PIN2, led_value);        
+        if ((millis() - prev_time2) > random_num*1000){          
           lcd.setCursor(3,0);
           lcd.print("Preparando");
           lcd.setCursor(4,1);
           lcd.print("Cafe ...");
-          //treat led2 
+          
+          controller.add(&shine_led);
+
+          //analogWrite(LED_PIN2, led_value);        
+
+          //int x = 0;
+          //for(int i = 0; i <= random_num*1000; i++){
+          //if ( i == 1000 || i == 2000 || i == 3000 ){
+              //Serial.println(led_value);
+          //led_value += 255/random_num;
+
+              //analogWrite(LED_PIN2, x);
+          //}else if ( i == 4000 || i == 5000 || i == 6000){
+            //led_value += 255/random_num;
+
+          //}else if ( i == 7000 || i == 8000){
+            //led_value += 255/random_num;
+          //}
+          Serial.println(led_value);
+          //analogWrite(LED_PIN2, led_value);
+          //Serial.println((millis() - prev_time2));
+
+          //}
+
           prev_time2 = millis();
+
         }else if ((millis() - prev_time2) ==  random_num*1000){
           lcd.clear();
           phase_one = false;
           phase_two = true;
           prev_time2 = 0;
+          analogWrite(LED_PIN2, 255);
+          controller.remove(&shine_led);
         }
       }
       if(phase_two){
-
+        
+        analogWrite(LED_PIN2, 0);
         if ((millis() - prev_time2) > 3000){
           //Serial.println(millis() - prev_time2);
           lcd.setCursor(4,0);
