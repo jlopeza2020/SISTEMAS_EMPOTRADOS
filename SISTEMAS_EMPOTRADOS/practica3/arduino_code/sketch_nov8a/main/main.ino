@@ -53,15 +53,21 @@ bool start_state = false;
 bool service_state = false;
 bool admin_state = false;
 bool detected_person = false;
-bool is_pressed = false;
 bool prepare_coffee = false;
 bool phase_one = false;
 bool phase_two = false;
 
 int ledstate = LOW;
 int counter_led1, counter_t_h, now_state_y, arr_pos, coffee_time, random_num, led_value;
-//unsigned long int time;
-unsigned long int prev_time, prev_time2;
+unsigned long int prev_time;
+unsigned long int prev_time2 = 0;
+unsigned long int prev_time3;
+unsigned long int now;
+unsigned long int now2;
+unsigned long int dif;
+unsigned long int dif2;
+unsigned long int out;
+
 
 
 String coffees[] = {"Cafe solo", "Cafe Cortado", "Cafe Doble", "Cafe Premium", "Chocolate"};
@@ -81,10 +87,9 @@ byte euro_symbol[8] = {
 };
 
 void callback_led_shine(){
-
   led_value += 255/random_num;
   //Serial.println(led_value);
-  analogWrite(LED_PIN2, led_value);  
+  analogWrite(LED_PIN2, led_value);
 }
 
 void preparing_coffee(){
@@ -121,17 +126,17 @@ void show_products(){
     if (joy_button == 0){
 
       lcd.clear();
-      //obtain random number between 4 to 8 
+      //get random number between 4 to 9 
       random_num = random(4,9);
       prepare_coffee = true;
       phase_one= true;
+      prev_time2 = millis();
     }
   
     prev_time = millis();
 
   }
 }
-
 
 void show_t_h(){
 
@@ -165,8 +170,11 @@ void callback_dist_thread(){
   int distance_sensor = 0;
 
   distance_sensor = get_distance();
+  //Serial.println(distance_sensor);
   if (0 < distance_sensor && distance_sensor < 100){
-    detected_person = true;  
+    Serial.println("dentro");
+    detected_person = true;
+    counter_t_h = 0; 
   }else{
     lcd.clear();
     lcd.setCursor(3,0);
@@ -216,6 +224,7 @@ void setup() {
   Timer1.initialize(500000);
   Timer1.attachInterrupt(blinkLED);
 
+  //Timer0.initialize(1000000);
   start_state = true;
 
   // THREADS SECTION 
@@ -238,6 +247,7 @@ void setup() {
   dht.begin();
   // create custom € symbol
   lcd.createChar(3, euro_symbol);
+
 }
 
 void loop() {
@@ -263,8 +273,9 @@ void loop() {
     }      
   }
 
-  if(service_state){
+  if(service_state){ // continuus loop 
 
+    // if button is pressed between 2-3 restart this part
     int distance_sensor = 0;
     controller.add(&distanceThread);
 
@@ -274,11 +285,12 @@ void loop() {
       //one second
       Timer1.setPeriod(1000000);
       Timer1.attachInterrupt(show_t_h);
-      if(counter_t_h < 5){
+      if(counter_t_h < 6){
  
         callback_hum_dist_thread();
-      }else if(counter_t_h == 5){
+      }else if(counter_t_h == 6){
         lcd.clear();
+        prepare_coffee = false;
 
       }else{
         detachInterrupt(digitalPinToInterrupt(DHT11_PIN));
@@ -292,7 +304,11 @@ void loop() {
       
       if(phase_one){ 
                
-        if ((millis() - prev_time2) > random_num*1000){          
+        now = millis();
+        //Serial.println(dif) ;
+
+        dif += (now - prev_time2);      
+        if(dif < random_num*10){          
           lcd.setCursor(3,0);
           lcd.print("Preparando");
           lcd.setCursor(4,1);
@@ -300,36 +316,51 @@ void loop() {
           
           controller.add(&shine_led);
 
-          prev_time2 = millis();
 
-        }else if ((millis() - prev_time2) ==  random_num*1000){
+        }else{
+    
           lcd.clear();
+          analogWrite(LED_PIN2, 0);
+          controller.remove(&shine_led);
           phase_one = false;
           phase_two = true;
-          prev_time2 = 0;
-          analogWrite(LED_PIN2, 255);
-          controller.remove(&shine_led);
+          prev_time3 = millis();
+          dif = 0;
         }
+        prev_time2 = millis();
+        
       }
       if(phase_two){
         
-        analogWrite(LED_PIN2, 0);
-        if ((millis() - prev_time2) > 3000){
+        //analogWrite(LED_PIN2, 0);
+        now2 = millis();
+        Serial.println(dif) ;
+
+        dif2 += (now2 - prev_time3);
+        if (dif2 < 30){
           lcd.setCursor(4,0);
           lcd.print("RETIRE");
           lcd.setCursor(4,1);
           lcd.print("BEBIDA");
-          prev_time2 = millis();
+          //prev_time3 = millis();
 
-        }else if ((millis() - prev_time2) ==  3000){
+        }else{
           lcd.clear();
           phase_two = false;
-          prev_time2 = 0;
-          //meter watchdog para reiniciar hasta la fun servicio 
+          //prev_time3 = 0;
+          detected_person = false;
+          dif2 = 0;
+          //counter_t_h = 0;
+
         }
+        prev_time3 = millis();
+
       }
     }
   }
+  //Serial.println(counter_t_h);
+  //añadir admin state
+
   controller.run();
 }
 
