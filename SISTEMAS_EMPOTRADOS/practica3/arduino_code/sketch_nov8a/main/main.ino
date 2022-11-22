@@ -50,6 +50,7 @@ Thread distanceThread = Thread();
 Thread  hum_tempThread = Thread();
 Thread shine_led = Thread();
 Thread button_pressed = Thread();
+Thread admin = Thread();
 
 //global vars
 bool start_state = false;
@@ -72,10 +73,6 @@ unsigned long int time;
 unsigned long int time2;
 unsigned long int time3;
 
-//unsigned int button_state;
-
-
-
 String coffees[] = {"Cafe solo", "Cafe Cortado", "Cafe Doble", "Cafe Premium", "Chocolate"};
 float prices[] = {1, 1.10, 1.25, 1.50, 2.00};
 float distancia;
@@ -93,80 +90,48 @@ byte euro_symbol[8] = {
 };
 
 
-
-/*const int timeThreshold = 150;
-//const int intPin = 2;
-volatile int ISRCounter = 0;
-int counter = 0;
-long startTime = 0;
-
-void debounceCount()
-{
-	if (millis() - startTime > timeThreshold)
-	{
-		ISRCounter++;
-		startTime = millis();
-	}
-}*/
-
-
-/*void check_button(){
-
-  if ((millis() - prev_time2) > 150){
-    unsigned int button_state = digitalRead(BUTTON);
-    //Serial.println(button_state);
-    if (button_state == 0){
-      
-      Serial.println(digitalRead(BUTTON));
-      Serial.println("button pressed"); 
-      counter_t_h = 0;
-      prepare_coffee = false;
-      phase_one = false;
-      count = 0;
-      phase_two = false;
-      lastTimeTemp = 0;
-    }
-    prev_time2 = millis();
-  }
-  //Serial.println(digitalRead(BUTTON));
-
-  
-}*/
-void callback_button(){
+void callback_admin_mode(){
 
   unsigned int button_state = digitalRead(BUTTON);
-  //Serial.println(button_state);
-  /*if (button_state == 0){
-      
-    Serial.println(button_state);
-    Serial.println("button pressed"); 
-    counter_t_h = 0;
-    prepare_coffee = false;
-    phase_one = false;
-    count = 0;
-    phase_two = false;
-    lastTimeTemp = 0;
-    controller.remove(&distanceThread);
-    detachInterrupt(digitalPinToInterrupt(DHT11_PIN));
-    controller.remove(&shine_led);
-    analogWrite(LED_PIN2, 0);
-    controller.remove(&callback_button);
-  }*/
 
-  //button_state = digitalRead(BUTTON);
   if(button_state == 0) {
     time=millis();
     while(button_state == 0) {
       time2=millis();
       button_state= digitalRead(BUTTON);
-
     }
     time3=time2-time;
 
     Serial.println(time3);
 
   }
-  // reiniciar estado servicio 
+
+  // admin_mode 
+  if (time3 >= 5000){
+    start_state = false;
+    service_state = false;
+    lcd.clear();
+    admin_state = true;
+  }
+}
+
+void callback_button(){
+
+  unsigned int button_state = digitalRead(BUTTON);
+
+  if(button_state == 0) {
+    time=millis();
+    while(button_state == 0) {
+      time2=millis();
+      button_state= digitalRead(BUTTON);
+    }
+    time3=time2-time;
+
+    Serial.println(time3);
+
+  }
+
+  // rrestart service state 
   if (time3 >= 2000 && time3 <= 3000){
     counter_t_h = 0;
     prepare_coffee = false;
@@ -178,18 +143,15 @@ void callback_button(){
     detachInterrupt(digitalPinToInterrupt(DHT11_PIN));
     controller.remove(&shine_led);
     analogWrite(LED_PIN2, 0);
-    //phase_two = false;
     detected_person = false;
-    controller.remove(&callback_button);
     controller.remove(&distanceThread);
     time3 = 0;
-    
+    controller.remove(&callback_button);
   }
 }
 
 void callback_led_shine(){
   led_value += 255/random_num;
-  //Serial.println(led_value);
   analogWrite(LED_PIN2, led_value);
 }
 
@@ -198,18 +160,9 @@ void preparing_coffee(){
 }
 void show_products(){
 
-  //now_state_y = analogRead(Y_AXIS);
-  //Serial.println(now_state_y);
-  //now_state_x = analogRead(X_AXIS);
-  //Serial.println(now_state_x);
-
   if ((millis() - prev_time) > 150){
 
     now_state_y = analogRead(Y_AXIS);
-    //Serial.println(now_state_y);
-
-    //now_state_x = analogRead(X_AXIS);
-    //Serial.println(now_state_x);
 
     if (now_state_y < 100){
       if(arr_pos > 0){
@@ -326,7 +279,7 @@ void setup() {
 
   // make sure led is off
   digitalWrite(LED_PIN1, LOW);
-  analogWrite(LED_PIN1, 0);
+  analogWrite(LED_PIN2, 0);
 
   //start interruption
   // 500 milis 
@@ -355,20 +308,26 @@ void setup() {
   button_pressed.enabled = true;
   button_pressed.setInterval(250);
   button_pressed.onRun(callback_button);
+
+  //in admin mode
+  admin.enabled = true;
+  admin.setInterval(250);
+  admin.onRun(callback_admin_mode);
+
   
-
-
-
   Serial.begin(9600);
   dht.begin();
   // create custom € symbol
   lcd.createChar(3, euro_symbol);
 
+  //set random seed
   randomSeed(analogRead(A0));
 
 }
 
 void loop() {
+
+  controller.add(&admin);
 
   if (start_state){
     if(counter_led1 < 8){
@@ -399,9 +358,9 @@ void loop() {
 
     // fase b
     if(detected_person){
-      controller.add(&button_pressed);
 
-      //attachInterruptdigitalPinToInterrupt(BUTTON), debounceCount, FALLING);
+      // if button is pressed between 2-3 restart this part
+      controller.add(&button_pressed);
 
       controller.remove(&distanceThread);
       //one second
@@ -478,18 +437,21 @@ void loop() {
             count = 0;
             led_value = 0;
           }
-          //check_button();
 
         }
       
       }
 
-      //check_button();
     }
 
   }
+  
+  if (admin_state){
+    digitalWrite(LED_PIN1, HIGH);
+    analogWrite(LED_PIN2, 255);
+    //hacer lista
+  }
 
-  // check if button is pressed  for admin mode 
 
   controller.run();
 }
