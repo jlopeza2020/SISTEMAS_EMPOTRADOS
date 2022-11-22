@@ -67,6 +67,11 @@ unsigned long int prev_time2;
 long lastTimeTemp = 0;
 int count = 0;
 int now_state_x;
+int counter_button;
+unsigned long int time;
+unsigned long int time2;
+unsigned long int time3;
+
 //unsigned int button_state;
 
 
@@ -131,7 +136,7 @@ void callback_button(){
 
   unsigned int button_state = digitalRead(BUTTON);
   //Serial.println(button_state);
-  if (button_state == 0){
+  /*if (button_state == 0){
       
     Serial.println(button_state);
     Serial.println("button pressed"); 
@@ -146,8 +151,40 @@ void callback_button(){
     controller.remove(&shine_led);
     analogWrite(LED_PIN2, 0);
     controller.remove(&callback_button);
-  }
+  }*/
 
+  //button_state = digitalRead(BUTTON);
+  if(button_state == 0) {
+    time=millis();
+    while(button_state == 0) {
+      time2=millis();
+      button_state= digitalRead(BUTTON);
+
+    }
+    time3=time2-time;
+
+    Serial.println(time3);
+
+  }
+  // reiniciar estado servicio 
+  if (time3 >= 2000 && time3 <= 3000){
+    counter_t_h = 0;
+    prepare_coffee = false;
+    phase_one = false;
+    count = 0;
+    phase_two = false;
+    lastTimeTemp = 0;
+    controller.remove(&distanceThread);
+    detachInterrupt(digitalPinToInterrupt(DHT11_PIN));
+    controller.remove(&shine_led);
+    analogWrite(LED_PIN2, 0);
+    //phase_two = false;
+    detected_person = false;
+    controller.remove(&callback_button);
+    controller.remove(&distanceThread);
+    time3 = 0;
+    
+  }
 }
 
 void callback_led_shine(){
