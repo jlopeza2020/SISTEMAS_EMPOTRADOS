@@ -27,7 +27,7 @@
 #define Y_AXIS A0     
 #define SW_BUTTON 9 
 
-#define BUTTON 1; 
+#define BUTTON A2
 
 //lcd structure
 #define RS 12
@@ -49,6 +49,7 @@ ThreadController controller = ThreadController();
 Thread distanceThread = Thread();
 Thread  hum_tempThread = Thread();
 Thread shine_led = Thread();
+Thread button_pressed = Thread();
 
 //global vars
 bool start_state = false;
@@ -63,14 +64,10 @@ int ledstate = LOW;
 int counter_led1, counter_t_h, now_state_y, arr_pos, coffee_time, random_num, led_value;
 unsigned long int prev_time;
 unsigned long int prev_time2;
-unsigned long int prev_time3;
-unsigned long int now;
-unsigned long int now2;
-unsigned long int dif;
-unsigned long int dif2;
-
 long lastTimeTemp = 0;
 int count = 0;
+int now_state_x;
+//unsigned int button_state;
 
 
 
@@ -90,6 +87,69 @@ byte euro_symbol[8] = {
   0b00110
 };
 
+
+
+/*const int timeThreshold = 150;
+//const int intPin = 2;
+volatile int ISRCounter = 0;
+int counter = 0;
+long startTime = 0;
+
+void debounceCount()
+{
+	if (millis() - startTime > timeThreshold)
+	{
+		ISRCounter++;
+		startTime = millis();
+	}
+}*/
+
+
+/*void check_button(){
+
+  if ((millis() - prev_time2) > 150){
+    unsigned int button_state = digitalRead(BUTTON);
+    //Serial.println(button_state);
+    if (button_state == 0){
+      
+      Serial.println(digitalRead(BUTTON));
+      Serial.println("button pressed"); 
+      counter_t_h = 0;
+      prepare_coffee = false;
+      phase_one = false;
+      count = 0;
+      phase_two = false;
+      lastTimeTemp = 0;
+    }
+    prev_time2 = millis();
+  }
+  //Serial.println(digitalRead(BUTTON));
+
+  
+}*/
+void callback_button(){
+
+  unsigned int button_state = digitalRead(BUTTON);
+  //Serial.println(button_state);
+  if (button_state == 0){
+      
+    Serial.println(button_state);
+    Serial.println("button pressed"); 
+    counter_t_h = 0;
+    prepare_coffee = false;
+    phase_one = false;
+    count = 0;
+    phase_two = false;
+    lastTimeTemp = 0;
+    controller.remove(&distanceThread);
+    detachInterrupt(digitalPinToInterrupt(DHT11_PIN));
+    controller.remove(&shine_led);
+    analogWrite(LED_PIN2, 0);
+    controller.remove(&callback_button);
+  }
+
+}
+
 void callback_led_shine(){
   led_value += 255/random_num;
   //Serial.println(led_value);
@@ -101,9 +161,18 @@ void preparing_coffee(){
 }
 void show_products(){
 
-  now_state_y = analogRead(Y_AXIS);
+  //now_state_y = analogRead(Y_AXIS);
+  //Serial.println(now_state_y);
+  //now_state_x = analogRead(X_AXIS);
+  //Serial.println(now_state_x);
 
   if ((millis() - prev_time) > 150){
+
+    now_state_y = analogRead(Y_AXIS);
+    //Serial.println(now_state_y);
+
+    //now_state_x = analogRead(X_AXIS);
+    //Serial.println(now_state_x);
 
     if (now_state_y < 100){
       if(arr_pos > 0){
@@ -134,7 +203,6 @@ void show_products(){
       random_num = random(4,9);
       prepare_coffee = true;
       phase_one= true;
-      prev_time2 = millis();
     }
   
     prev_time = millis();
@@ -215,6 +283,7 @@ void setup() {
   pinMode(X_AXIS, INPUT);
   pinMode(Y_AXIS, INPUT);
   pinMode(SW_BUTTON, INPUT_PULLUP);
+  //pinMode(BUTTON, INPUT_PULLUP);
 
   lcd.begin(LCD_COLS,LCD_ROWS);
 
@@ -245,10 +314,20 @@ void setup() {
   shine_led.setInterval(1000);
   shine_led.onRun(callback_led_shine);
 
+  //button_pressed
+  button_pressed.enabled = true;
+  button_pressed.setInterval(250);
+  button_pressed.onRun(callback_button);
+  
+
+
+
   Serial.begin(9600);
   dht.begin();
   // create custom € symbol
   lcd.createChar(3, euro_symbol);
+
+  randomSeed(analogRead(A0));
 
 }
 
@@ -281,15 +360,20 @@ void loop() {
     int distance_sensor = 0;
     controller.add(&distanceThread);
 
-    // show durante 5 segundos 
+    // fase b
     if(detected_person){
+      controller.add(&button_pressed);
+
+      //attachInterruptdigitalPinToInterrupt(BUTTON), debounceCount, FALLING);
+
       controller.remove(&distanceThread);
       //one second
       Timer1.setPeriod(1000000);
       Timer1.attachInterrupt(show_t_h);
+
       if(counter_t_h <= 5){
  
-        callback_hum_dist_thread();
+        callback_hum_dist_thread();      
       }else if(counter_t_h == 6){
         lcd.clear();
         prepare_coffee = false;
@@ -301,115 +385,75 @@ void loop() {
         }
         
       }
-    }
-    if(prepare_coffee){
+
+      if(prepare_coffee){
       
-      if(phase_one){ 
+        if(phase_one){ 
                
-        /*now = millis();
+          if (millis() - lastTimeTemp > SEC){
 
-        dif += (now - prev_time2);      
-        if(dif < random_num*10){          
-          lcd.setCursor(3,0);
-          lcd.print("Preparando");
-          lcd.setCursor(4,1);
-          lcd.print("Cafe ...");
-          
-          controller.add(&shine_led);
-
-
-        }else{
+            lastTimeTemp = millis();
+            count++;
     
-          lcd.clear();
-          analogWrite(LED_PIN2, 0);
-          controller.remove(&shine_led);
-          phase_one = false;
-          phase_two = true;
-          prev_time3 = millis();
-          dif = 0;
+          }
+          if (count <= random_num){
+
+            lcd.setCursor(3,0);
+            lcd.print("Preparando");
+            lcd.setCursor(4,1);
+            lcd.print("Cafe ...");
+
+            controller.add(&shine_led);
+
+          }else{
+            lcd.clear();
+            analogWrite(LED_PIN2, 0);
+            controller.remove(&shine_led);
+            phase_one = false;
+            phase_two = true;
+            lastTimeTemp = 0;
+            count = 0;
+        
+          }
         }
-        prev_time2 = millis();*/
+        if(phase_two){
+        
 
-        if (millis() - lastTimeTemp > SEC){
+          if (millis() - lastTimeTemp > SEC){
 
-          lastTimeTemp = millis();
-          count++;
+            lastTimeTemp = millis();
+            count++;
     
-        }
-        if (count <= random_num){
-          //Serial.println("1s");
-          lcd.setCursor(3,0);
-          lcd.print("Preparando");
-          lcd.setCursor(4,1);
-          lcd.print("Cafe ...");
+          }
+          if (count <= 3){
 
-          controller.add(&shine_led);
+            lcd.setCursor(4,0);
+            lcd.print("RETIRE");
+            lcd.setCursor(4,1);
+            lcd.print("BEBIDA");
 
-        }else{
-          lcd.clear();
-          analogWrite(LED_PIN2, 0);
-          controller.remove(&shine_led);
-          phase_one = false;
-          phase_two = true;
-          lastTimeTemp = 0;
-          count = 0;
-        
-        }
+          }else{
 
-      }if(phase_two){
-        
-        //now2 = millis();
-        //Serial.println(dif) ;
-
-        if (millis() - lastTimeTemp > SEC){
-
-          lastTimeTemp = millis();
-          count++;
-    
-        }
-        if (count <= 3){
-          //Serial.println("1s");
-          lcd.setCursor(4,0);
-          lcd.print("RETIRE");
-          lcd.setCursor(4,1);
-          lcd.print("BEBIDA");
-        }else{
-          lcd.clear();
-          phase_two = false;
-          detected_person = false;
-          lastTimeTemp = 0;
-          count = 0;
-        
-        }
-        //else{
-
-        //  lcd.clear();
-        //  phase_two = false;
-        // detected_person = false;
-        //  dif2 = 0;
-
-        //}
-
-        
-        /*dif2 += (now2 - prev_time3);
-        if (dif2 < 30){
-          lcd.setCursor(4,0);
-          lcd.print("RETIRE");
-          lcd.setCursor(4,1);
-          lcd.print("BEBIDA");
-
-        }else{
-          lcd.clear();
-          phase_two = false;
-          detected_person = false;
-          dif2 = 0;
+            lcd.clear();
+            phase_two = false;
+            detected_person = false;
+            lastTimeTemp = 0;
+            count = 0;
+            led_value = 0;
+          }
+          //check_button();
 
         }
-        prev_time3 = millis();*/
-
+      
       }
+
+      //check_button();
     }
+
   }
+
+  // check if button is pressed  for admin mode 
+
   controller.run();
 }
 
