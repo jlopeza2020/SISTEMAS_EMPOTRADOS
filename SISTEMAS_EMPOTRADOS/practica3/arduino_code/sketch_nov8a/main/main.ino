@@ -39,6 +39,8 @@
 #define LCD_COLS 16
 #define LCD_ROWS 2
 
+#define SEC 1000
+
 LiquidCrystal lcd(RS, ENABLE, D0, D1, D2, D3);
 DHT dht(DHT11_PIN, DHTTYPE);
 
@@ -66,6 +68,9 @@ unsigned long int now;
 unsigned long int now2;
 unsigned long int dif;
 unsigned long int dif2;
+
+long lastTimeTemp = 0;
+int count = 0;
 
 
 
@@ -282,7 +287,7 @@ void loop() {
       //one second
       Timer1.setPeriod(1000000);
       Timer1.attachInterrupt(show_t_h);
-      if(counter_t_h < 6){
+      if(counter_t_h <= 5){
  
         callback_hum_dist_thread();
       }else if(counter_t_h == 6){
@@ -301,7 +306,7 @@ void loop() {
       
       if(phase_one){ 
                
-        now = millis();
+        /*now = millis();
 
         dif += (now - prev_time2);      
         if(dif < random_num*10){          
@@ -323,15 +328,70 @@ void loop() {
           prev_time3 = millis();
           dif = 0;
         }
-        prev_time2 = millis();
+        prev_time2 = millis();*/
 
-      }
-      if(phase_two){
+        if (millis() - lastTimeTemp > SEC){
+
+          lastTimeTemp = millis();
+          count++;
+    
+        }
+        if (count <= random_num){
+          //Serial.println("1s");
+          lcd.setCursor(3,0);
+          lcd.print("Preparando");
+          lcd.setCursor(4,1);
+          lcd.print("Cafe ...");
+
+          controller.add(&shine_led);
+
+        }else{
+          lcd.clear();
+          analogWrite(LED_PIN2, 0);
+          controller.remove(&shine_led);
+          phase_one = false;
+          phase_two = true;
+          lastTimeTemp = 0;
+          count = 0;
         
-        now2 = millis();
-        Serial.println(dif) ;
+        }
 
-        dif2 += (now2 - prev_time3);
+      }if(phase_two){
+        
+        //now2 = millis();
+        //Serial.println(dif) ;
+
+        if (millis() - lastTimeTemp > SEC){
+
+          lastTimeTemp = millis();
+          count++;
+    
+        }
+        if (count <= 3){
+          //Serial.println("1s");
+          lcd.setCursor(4,0);
+          lcd.print("RETIRE");
+          lcd.setCursor(4,1);
+          lcd.print("BEBIDA");
+        }else{
+          lcd.clear();
+          phase_two = false;
+          detected_person = false;
+          lastTimeTemp = 0;
+          count = 0;
+        
+        }
+        //else{
+
+        //  lcd.clear();
+        //  phase_two = false;
+        // detected_person = false;
+        //  dif2 = 0;
+
+        //}
+
+        
+        /*dif2 += (now2 - prev_time3);
         if (dif2 < 30){
           lcd.setCursor(4,0);
           lcd.print("RETIRE");
@@ -345,7 +405,7 @@ void loop() {
           dif2 = 0;
 
         }
-        prev_time3 = millis();
+        prev_time3 = millis();*/
 
       }
     }
