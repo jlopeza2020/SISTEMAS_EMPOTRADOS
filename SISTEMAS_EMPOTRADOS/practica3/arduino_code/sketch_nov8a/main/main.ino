@@ -39,9 +39,6 @@
 #define LCD_COLS 16
 #define LCD_ROWS 2
 
-//VALUES
-//#define SEC 1000
-
 // in miliseconds 
 #define THREE_HUNDRED_MS 300
 #define TWO_HUNDRED_FIFTY_MS 250
@@ -57,7 +54,7 @@
 #define ONE_SEC 1000000
 #define TEN_MICROS 10
 
-// SECONDS
+// seconds
 #define FIVE_S 5
 #define SIX_S 6
 #define THREE_S 3
@@ -101,6 +98,8 @@ Thread shine_led = Thread();
 Thread button_pressed = Thread();
 Thread admin = Thread();
 Thread out_admin = Thread();
+Thread sub_menu_temp = Thread();
+Thread sub_menu_dist = Thread();
 
 //global vars
 bool start_state = false;
@@ -114,17 +113,11 @@ bool changing_prices = false;
 bool sub_menus = false;
 
 int ledstate = LOW;
-int counter_led1, counter_t_h, now_state_y, arr_pos, coffee_time, random_num, led_value;
-unsigned long int prev_time;
-unsigned long int prev_time2;
+int counter_led1, counter_t_h, now_state_y, arr_pos, coffee_time, random_num;
+int now_state_x,counter_button,led_value, arr_pos_2;
+unsigned long int prev_time, prev_time2,time, time2,time3;
 long lastTimeTemp = 0;
 int count = 0;
-int now_state_x;
-int counter_button;
-unsigned long int time;
-unsigned long int time2;
-unsigned long int time3;
-int arr_pos_2;
 
 String coffees[] = {"Cafe solo", "Cafe Cortado", "Cafe Doble", "Cafe Premium", "Chocolate"};
 float prices[] = {1, 1.10, 1.25, 1.50, 2.00};
@@ -154,6 +147,7 @@ void setup() {
   pinMode(Y_AXIS, INPUT);
   pinMode(SW_BUTTON, INPUT_PULLUP);
 
+  // set dimensions of lcd
   lcd.begin(LCD_COLS,LCD_ROWS);
 
   // make sure leds are off
@@ -193,9 +187,20 @@ void setup() {
   out_admin.setInterval(TWO_HUNDRED_FIFTY_MS);
   out_admin.onRun(callback_out_admin_mode);
 
+  // sub menu temperature and humidity 
+  sub_menu_temp.enabled = true;
+  sub_menu_temp.setInterval(TWO_HUNDRED_FIFTY_MS);
+  sub_menu_temp.onRun(callback_sub_menu_temp);
+
+ // sub menu distance  
+  sub_menu_dist.enabled = true;
+  sub_menu_dist.setInterval(THREE_HUNDRED_MS);
+  sub_menu_dist.onRun(callback_sub_menu_dist);
+
   
   Serial.begin(9600);
   dht.begin();
+  
   // create custom € symbol
   lcd.createChar(VAR_EURO, euro_symbol);
 
@@ -206,11 +211,12 @@ void setup() {
 
 void loop() {
 
+  //we can get to the admin mode at any time
   controller.add(&admin);
 
   if (start_state){
     if(counter_led1 < MAX_LED1_S){
-      // for the lcd not move letters
+      //show "CARGANDO"  while led blink 3 times in interval of 1 sec (500 milis)
       lcd.setCursor(3,0);
       lcd.print("CARGANDO...");
       digitalWrite(LED_PIN1, ledstate);
@@ -218,35 +224,41 @@ void loop() {
       // this interruption we won't use it again so I disable it
       detachInterrupt(digitalPinToInterrupt(LED_PIN1));
       lcd.clear();
-
+    
     }else if (counter_led1 >= MAX_LED1_S && counter_led1  <= MAX_START_S){
+      //show "Servicio"
       lcd.setCursor(3,0);
       lcd.print("Servicio");
     }else{
+      //end of start_state
       lcd.clear();
       service_state = true;
       start_state = false;
     }      
   }
 
-  if(service_state){ // continous loop 
+  // main loop of our program 
+  if(service_state){ 
 
-    //int distance_sensor = 0;
+    // Shows "ESPERANDO CLIENTE" while is looking
+    // for a person which is between 1 meter.
     controller.add(&distanceThread);
 
-    // b phase
+    // service state phase b)
     if(detected_person){
 
-      // if button is pressed between 2-3 restart service state
+      // if button is pressed between 2-3 s restart service state
       controller.add(&button_pressed);
 
+      //we do not need this thread any more
       controller.remove(&distanceThread);
-      //one second
+      
       Timer1.setPeriod(ONE_SEC);
       Timer1.attachInterrupt(show_t_h);
 
+      //shows  humidity and temperature for 5s
       if(counter_t_h <= FIVE_S){
- 
+
         hum_temp();      
       }else if(counter_t_h == SIX_S){
         lcd.clear();
@@ -254,14 +266,18 @@ void loop() {
 
       }else{
         detachInterrupt(digitalPinToInterrupt(DHT11_PIN));
+        //shows all products while button is not pressed
         if(prepare_coffee != true){
           show_products();          
         }
         
       }
-
+      //after pushing button we enter into 2 phases     
       if(prepare_coffee){
       
+        //led shines incremental randomly between 4-8 secs
+        //each execution is different
+        // also shows " Preparando Cafe..." during that time 
         if(phase_one){ 
                
           if (millis() - lastTimeTemp > SEC2MS){
@@ -290,9 +306,9 @@ void loop() {
         
           }
         }
+        //shows "Retire bebida" along 3s 
         if(phase_two){
         
-
           if (millis() - lastTimeTemp > SEC2MS){
 
             lastTimeTemp = millis();
@@ -324,118 +340,71 @@ void loop() {
 
   }
 
+  // if button has been pressed more that
+  // 5s you can enter to this state
   if (admin_state){
 
     controller.remove(&admin);
-    controller.add(&out_admin);    
+    // to get out of this phase you need to press
+    // the button more than 5s
+    controller.add(&out_admin);
+    // both leds are on     
     digitalWrite(LED_PIN1, HIGH);
     analogWrite(LED_PIN2, MAX_ANALOG_VALUE);
 
+    //show menu list until the button is 
+    // pressed to choose a sub_menu
     if(sub_menus != true){
       show_list();
     }
 
+    // if one option has been chosen
     if (sub_menus){
       if ((millis() - prev_time) > ONE_HUNDRED_FIFTY_MS){
 
-        float hum = dht.readHumidity();
-
-        // Read temperature as Celsius
-        float temp = dht.readTemperature();
-        
-        
         if (arr_pos == 0){
-          lcd.setCursor(0, 0);
-          lcd.print("Temp:");
-          lcd.print(int(temp));
-          lcd.print((char)223);
-          lcd.print("C");
-          lcd.print("Hum:");
-          lcd.print(int(hum));
-          lcd.print("%");
-          //añadir thread temp y hum
-
-
+          controller.add(&sub_menu_temp);
+          
         }else if (arr_pos == 1){
-
-          lcd.setCursor(0, 0);
-          lcd.print("Distancia: ");
-          lcd.print(get_distance());
-          lcd.print("cm");
-          //lcd.clear();          
-
-        //añadir thread distancia
-
+          controller.add(&sub_menu_dist);
 
         }else if (arr_pos == 2){
-          lcd.setCursor(6, 0);
-          lcd.print(millis()/SEC2MS);
-          lcd.print("s");
-        }else if (arr_pos == 3){
-          Serial.println(arr_pos_2);
+          sub_menu_secs();
           
-          now_state_y = analogRead(Y_AXIS);
-          //if ((millis() - prev_time) > ONE_HUNDRED_FIFTY_MS){
-
-          if (now_state_y < UP){
-            if(arr_pos_2 > MIN_POS){
-              arr_pos_2--;
-              lcd.clear();
-            }
-          }
-          if (now_state_y > DOWN){
-            if(arr_pos_2 < 4){
-              arr_pos_2++;
-              lcd.clear();
-            }
-          }
-          lcd.setCursor(0, 0);
-          lcd.print(coffees[arr_pos_2]);
-          lcd.setCursor(0, 1); 
-          lcd.print(prices[arr_pos_2]);
-          lcd.write(VAR_EURO);
-
-          now_state_x = analogRead(X_AXIS);
-
-          if (now_state_x > RIGHT){
-            lcd.setCursor(0, 0);
-            lcd.print(coffees[arr_pos_2]);
-            Serial.println("derecha");
-            changing_prices = true;
-      
-          }
-
-            //prev_time = millis();
-          //}*/
+        }else{
+          sub_menu_prices();
         }
 
+        // go back to the menu list 
         now_state_x = analogRead(X_AXIS);
-        //Serial.println(now_state_x);
-        // calceling price I want to set and fix the initial one
         if (now_state_x < LEFT){
 
-          //prices[arr_pos-2] = initial_prices[arr_pos -2];
           lcd.clear();
+          controller.remove(&sub_menu_dist);
+          controller.remove(&sub_menu_temp);
           sub_menus = false;
         }
-
-
         prev_time = millis();
       }
          
     }
   
+    // after choosing a product to be changed 
     if (changing_prices){
 
-      Serial.println("Im in");
+      //Serial.println("I am in");
       if ((millis() - prev_time) > ONE_HUNDRED_FIFTY_MS){
+        
         now_state_y = analogRead(Y_AXIS);
 
+        // use up to increment value of the product
         if (now_state_y < UP){
           lcd.setCursor(0, 1); 
           lcd.print(prices[arr_pos_2] += 0.05);
           lcd.write(VAR_EURO);
         }
+
+        // use down to decrement the value of the product 
         if (now_state_y > DOWN){
           if (prices[arr_pos_2] > 0.00){
             lcd.setCursor(0, 1); 
@@ -443,7 +412,7 @@ void loop() {
             lcd.write(VAR_EURO);
           }
         }
-
+        // if you want to set the price, press the button 
         unsigned int joy_button = digitalRead(SW_BUTTON);
         if (joy_button == PRESSED){
 
@@ -452,19 +421,18 @@ void loop() {
 
         now_state_x = analogRead(X_AXIS);
 
-        //Serial.println(now_state_x);
-        // calceling price I want to set and fix the initial one
+        // go back to the menu and if the button has not 
+        // been pressed before, cancel the price and 
+        // set the initial one. 
         if (now_state_x < LEFT){
 
-          prices[arr_pos-2] = initial_prices[arr_pos -2];
+          prices[arr_pos_2] = initial_prices[arr_pos_2];
           changing_prices = false;
         }
         
-
         prev_time = millis();
 
       }
-
 
     }
 

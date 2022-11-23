@@ -1,4 +1,32 @@
+void callback_sub_menu_temp(){
+  float hum = dht.readHumidity();
 
+  // Read temperature as Celsius
+  float temp = dht.readTemperature();
+
+  lcd.setCursor(0, 0);
+  lcd.print("Temp:");
+  lcd.print(int(temp));
+  lcd.print((char)223);
+  lcd.print("C");
+  lcd.print("Hum:");
+  lcd.print(int(hum));
+  lcd.print("%");
+
+}
+
+void callback_sub_menu_dist(){
+  lcd.setCursor(0, 0);
+  lcd.print("Distancia: ");
+  lcd.print(get_distance());
+  lcd.print("cm");
+}
+
+
+
+//check if the button is pressed more that five secs
+// in admin mode and get out of it. Returns to 
+// the service state  
 void callback_out_admin_mode(){
 
   unsigned int button_state = digitalRead(BUTTON);
@@ -11,13 +39,10 @@ void callback_out_admin_mode(){
     }
     time3=time2-time;
 
-    //Serial.println("out");
-    Serial.println(time3);
-
   }
-  //out admin mode 
+
+  //gets out of admin mode 
   if (time3 >= FIVE_S2MS){
-    //Serial.println("out");    
     lcd.clear();
     digitalWrite(LED_PIN1, LOW);
     analogWrite(LED_PIN2, LOW);
@@ -28,6 +53,10 @@ void callback_out_admin_mode(){
   }
 
 }
+
+//check if the button is pressed more that five secs
+// in any part of the start or service states and 
+// gets into it 
 void callback_admin_mode(){
 
   controller.remove(&out_admin);
@@ -41,12 +70,11 @@ void callback_admin_mode(){
     }
     time3=time2-time;
 
-    Serial.println(time3);
-
   }
 
   // admin_mode 
   if (time3 >= FIVE_S2MS){
+
     start_state = false;
     service_state = false;
     lcd.clear();
@@ -68,6 +96,9 @@ void callback_admin_mode(){
   }
 }
 
+// if the button is pressed between 2 to 3 
+// secs, comes back to the service state
+// phase b) 
 void callback_service_button(){
 
   unsigned int button_state = digitalRead(BUTTON);
@@ -79,8 +110,6 @@ void callback_service_button(){
       button_state= digitalRead(BUTTON);
     }
     time3=time2-time;
-
-    Serial.println(time3);
 
   }
 
@@ -103,18 +132,23 @@ void callback_service_button(){
   }
 }
 
+// makes the led shine incrementally 
+// used in prepare coffee
 void callback_led_shine(){
   led_value += MAX_ANALOG_VALUE/random_num;
   analogWrite(LED_PIN2, led_value);
 }
 
+// if looking if a person is 
+// less than 1 meter closer 
+// else: prints "ESPERANDO CLIENTE"
 void callback_dist_thread(){
 
   int distance_sensor = 0;
 
   distance_sensor = get_distance();
   if (MIN_DIST_PERSON < distance_sensor && distance_sensor < MAX_DIST_PERSON){
-    Serial.println("dentro");
+
     detected_person = true;
     counter_t_h = 0; 
   }else{
