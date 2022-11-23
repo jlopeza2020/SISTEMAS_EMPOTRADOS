@@ -1,23 +1,43 @@
-void show_list(int temp, int hum){
+void show_list(){
 
   if ((millis() - prev_time) > ONE_HUNDRED_FIFTY_MS){
 
     now_state_y = analogRead(Y_AXIS);
 
     if (now_state_y < UP){
-      if(arr_pos > 0){
+      if(arr_pos > MIN_POS){
         arr_pos--;
         lcd.clear();
       }
     }
     if (now_state_y > DOWN){
-      if(arr_pos < 6){
+      if(arr_pos < 3){
         arr_pos++;
         lcd.clear();
       }
     }
-      
-    if(arr_pos == 0){
+    
+
+    lcd.setCursor(0, 0);
+    lcd.print(menu[arr_pos]);
+    lcd.setCursor(0, 1);
+    lcd.print(menu2[arr_pos]);
+
+    unsigned int joy_button = digitalRead(SW_BUTTON);
+    if (joy_button == PRESSED){
+      Serial.println("he sido pulsado");
+
+      lcd.clear();
+      //get random number between 4 to 8
+      //random_num = random(MIN_RND,MAX_RND);
+      //prepare_coffee = true;
+      //phase_one= true;
+      //arr_pos_2 = 0;
+      sub_menus = true;
+
+    }    
+
+    /*if(arr_pos == 0){
 
       lcd.setCursor(0, 0);
       lcd.print("Temp:");
@@ -41,7 +61,7 @@ void show_list(int temp, int hum){
       lcd.print("cm");
 
       lcd.setCursor(0, 1);
-      lcd.print(millis()/1000);
+      lcd.print(millis()/SEC2MS);
       lcd.print("s");
     }else{
       lcd.setCursor(0, 0);
@@ -53,7 +73,7 @@ void show_list(int temp, int hum){
 
     now_state_x = analogRead(X_AXIS);
 
-    if (now_state_x > 900){
+    if (now_state_x > RIGHT){
       lcd.setCursor(0, 0);
       lcd.print(coffees[arr_pos-2]);
       changing_prices = true;
@@ -67,12 +87,13 @@ void show_list(int temp, int hum){
     //  lcd.print(coffees[arr_pos-2]);
     //  changing_prices = true;
 
-    //}
+    //}*/
 
     prev_time = millis();
     
   }
 }
+
 void preparing_coffee(){
   coffee_time++;
 }
@@ -84,13 +105,13 @@ void show_products(){
     now_state_y = analogRead(Y_AXIS);
 
     if (now_state_y < UP){
-      if(arr_pos > 0){
+      if(arr_pos > MIN_POS){
         arr_pos--;
         lcd.clear();
       }
     }
     if (now_state_y > DOWN){
-      if(arr_pos < 4){
+      if(arr_pos < MAX_POS_INIT_LIST){
         arr_pos++;
         lcd.clear();
       }
@@ -156,7 +177,7 @@ int get_distance(){
   float time;
   float distance;
   digitalWrite(TRIGGER_PIN, HIGH);
-  delayMicroseconds(10);
+  delayMicroseconds(TEN_MICROS);
   digitalWrite(TRIGGER_PIN, LOW);
   time=pulseIn(ECHO_PIN, HIGH);
   

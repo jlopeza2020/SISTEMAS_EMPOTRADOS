@@ -55,6 +55,7 @@
 //in microseconds
 #define FIVE_HUNDRED_MS 500000
 #define ONE_SEC 1000000
+#define TEN_MICROS 10
 
 // SECONDS
 #define FIVE_S 5
@@ -70,6 +71,7 @@
 #define DOWN 900
 // x axis
 #define LEFT 100
+#define RIGHT 900
 
 // button (either joystick or the other)
 #define PRESSED 0
@@ -109,6 +111,7 @@ bool prepare_coffee = false;
 bool phase_one = false;
 bool phase_two = false;
 bool changing_prices = false;
+bool sub_menus = false;
 
 int ledstate = LOW;
 int counter_led1, counter_t_h, now_state_y, arr_pos, coffee_time, random_num, led_value;
@@ -121,10 +124,14 @@ int counter_button;
 unsigned long int time;
 unsigned long int time2;
 unsigned long int time3;
+int arr_pos_2;
 
 String coffees[] = {"Cafe solo", "Cafe Cortado", "Cafe Doble", "Cafe Premium", "Chocolate"};
 float prices[] = {1, 1.10, 1.25, 1.50, 2.00};
+
 float initial_prices[] = {1, 1.10, 1.25, 1.50, 2.00};
+String menu[] = {"i. Ver", "ii. Ver", "iii. Ver", "iv. Modificar"};
+String menu2[] = {"temperatura", "distancia sensor", "contador", "precios"};
 float distancia;
 
 byte euro_symbol[8] = {
@@ -324,12 +331,99 @@ void loop() {
     digitalWrite(LED_PIN1, HIGH);
     analogWrite(LED_PIN2, MAX_ANALOG_VALUE);
 
-    float hum = dht.readHumidity();
+    if(sub_menus != true){
+      show_list();
+    }
 
-    // Read temperature as Celsius
-    float temp = dht.readTemperature();
+    if (sub_menus){
+      if ((millis() - prev_time) > ONE_HUNDRED_FIFTY_MS){
 
-    show_list(temp, hum);
+        float hum = dht.readHumidity();
+
+        // Read temperature as Celsius
+        float temp = dht.readTemperature();
+        
+        
+        if (arr_pos == 0){
+          lcd.setCursor(0, 0);
+          lcd.print("Temp:");
+          lcd.print(int(temp));
+          lcd.print((char)223);
+          lcd.print("C");
+          lcd.print("Hum:");
+          lcd.print(int(hum));
+          lcd.print("%");
+          //añadir thread temp y hum
+
+
+        }else if (arr_pos == 1){
+
+          lcd.setCursor(0, 0);
+          lcd.print("Distancia: ");
+          lcd.print(get_distance());
+          lcd.print("cm");
+          //lcd.clear();          
+
+        //añadir thread distancia
+
+
+        }else if (arr_pos == 2){
+          lcd.setCursor(6, 0);
+          lcd.print(millis()/SEC2MS);
+          lcd.print("s");
+        }else if (arr_pos == 3){
+          Serial.println(arr_pos_2);
+          
+          now_state_y = analogRead(Y_AXIS);
+          //if ((millis() - prev_time) > ONE_HUNDRED_FIFTY_MS){
+
+          if (now_state_y < UP){
+            if(arr_pos_2 > MIN_POS){
+              arr_pos_2--;
+              lcd.clear();
+            }
+          }
+          if (now_state_y > DOWN){
+            if(arr_pos_2 < 4){
+              arr_pos_2++;
+              lcd.clear();
+            }
+          }
+          lcd.setCursor(0, 0);
+          lcd.print(coffees[arr_pos_2]);
+          lcd.setCursor(0, 1); 
+          lcd.print(prices[arr_pos_2]);
+          lcd.write(VAR_EURO);
+
+          now_state_x = analogRead(X_AXIS);
+
+          if (now_state_x > RIGHT){
+            lcd.setCursor(0, 0);
+            lcd.print(coffees[arr_pos_2]);
+            Serial.println("derecha");
+            changing_prices = true;
+      
+          }
+
+            //prev_time = millis();
+          //}*/
+        }
+
+        now_state_x = analogRead(X_AXIS);
+        //Serial.println(now_state_x);
+        // calceling price I want to set and fix the initial one
+        if (now_state_x < LEFT){
+
+          //prices[arr_pos-2] = initial_prices[arr_pos -2];
+          lcd.clear();
+          sub_menus = false;
+        }
+
+
+        prev_time = millis();
+      }
+         
+    }
   
     if (changing_prices){
 
@@ -339,13 +433,13 @@ void loop() {
 
         if (now_state_y < UP){
           lcd.setCursor(0, 1); 
-          lcd.print(prices[arr_pos-2] += 0.05);
+          lcd.print(prices[arr_pos_2] += 0.05);
           lcd.write(VAR_EURO);
         }
         if (now_state_y > DOWN){
-          if (prices[arr_pos-2] > 0.00){
+          if (prices[arr_pos_2] > 0.00){
             lcd.setCursor(0, 1); 
-            lcd.print(prices[arr_pos-2] -= 0.05);
+            lcd.print(prices[arr_pos_2] -= 0.05);
             lcd.write(VAR_EURO);
           }
         }
