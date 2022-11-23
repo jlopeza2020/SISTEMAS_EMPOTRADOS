@@ -11,13 +11,13 @@ void callback_out_admin_mode(){
     }
     time3=time2-time;
 
-    Serial.println("out");
+    //Serial.println("out");
     Serial.println(time3);
 
   }
   //out admin mode 
   if (time3 >= FIVE_S2MS){
-    Serial.println("out");    
+    //Serial.println("out");    
     lcd.clear();
     digitalWrite(LED_PIN1, LOW);
     analogWrite(LED_PIN2, LOW);
@@ -59,7 +59,7 @@ void callback_admin_mode(){
     controller.remove(&distanceThread);
     detachInterrupt(digitalPinToInterrupt(DHT11_PIN));
     controller.remove(&shine_led);
-    analogWrite(LED_PIN2, 0);
+    analogWrite(LED_PIN2, LOW);
     detected_person = false;
     controller.remove(&distanceThread);
     time3 = 0;
@@ -104,7 +104,7 @@ void callback_service_button(){
 }
 
 void callback_led_shine(){
-  led_value += 255/random_num;
+  led_value += MAX_ANALOG_VALUE/random_num;
   analogWrite(LED_PIN2, led_value);
 }
 

@@ -59,6 +59,7 @@
 // SECONDS
 #define FIVE_S 5
 #define SIX_S 6
+#define THREE_S 3
 // LED1 seconds
 #define MAX_LED1_S 8 
 #define MAX_START_S 11 
@@ -81,6 +82,10 @@
 #define MAX_DIST_PERSON 100
 #define MIN_DIST_PERSON 0
 
+#define MAX_ANALOG_VALUE 255
+#define MAX_POS_INIT_LIST 4
+#define MAX_POS_ADMIN_LIST 6
+#define MIN_POS 0
 
 
 LiquidCrystal lcd(RS, ENABLE, D0, D1, D2, D3);
@@ -287,7 +292,7 @@ void loop() {
             count++;
     
           }
-          if (count <= 3){
+          if (count <= THREE_S){
 
             lcd.setCursor(4,0);
             lcd.print("RETIRE");
@@ -317,77 +322,15 @@ void loop() {
     controller.remove(&admin);
     controller.add(&out_admin);    
     digitalWrite(LED_PIN1, HIGH);
-    analogWrite(LED_PIN2, 255);
+    analogWrite(LED_PIN2, MAX_ANALOG_VALUE);
 
     float hum = dht.readHumidity();
 
     // Read temperature as Celsius
     float temp = dht.readTemperature();
+
+    show_list(temp, hum);
   
-    if ((millis() - prev_time) > ONE_HUNDRED_FIFTY_MS){
-
-      now_state_y = analogRead(Y_AXIS);
-
-      if (now_state_y < UP){
-        if(arr_pos > 0){
-          arr_pos--;
-          lcd.clear();
-        }
-      }
-      if (now_state_y > DOWN){
-        if(arr_pos < 6){
-          arr_pos++;
-          lcd.clear();
-        }
-      }
-      
-      if(arr_pos == 0){
-
-        lcd.setCursor(0, 0);
-        lcd.print("Temp:");
-        lcd.print(int(temp));
-        lcd.print("C");
-        lcd.print(" ");
-        lcd.print("Hum:");
-        lcd.print(int(hum));
-        lcd.print("%");
-
-        lcd.setCursor(0, 1);
-        lcd.print("Distancia: ");
-        lcd.print(get_distance());
-        lcd.print("cm");
-
-      }else if (arr_pos == 1){
-
-        lcd.setCursor(0, 0);
-        lcd.print("Distancia: ");
-        lcd.print(get_distance());
-        lcd.print("cm");
-
-        lcd.setCursor(0, 1);
-        lcd.print(millis()/1000);
-        lcd.print("s");
-      }else{
-        lcd.setCursor(0, 0);
-        lcd.print(coffees[arr_pos-2]);
-        lcd.setCursor(0, 1); 
-        lcd.print(prices[arr_pos-2]);
-        lcd.write(VAR_EURO);
-      }
-
-      unsigned int joy_button = digitalRead(SW_BUTTON);
-      if (joy_button == PRESSED){
-
-        lcd.setCursor(0, 0);
-        lcd.print(coffees[arr_pos-2]);
-        changing_prices = true;
-
-      }
-
-      prev_time = millis();
-    
-    }
-
     if (changing_prices){
 
       Serial.println("Im in");
@@ -400,7 +343,7 @@ void loop() {
           lcd.write(VAR_EURO);
         }
         if (now_state_y > DOWN){
-          if (prices[arr_pos-2] >= 0.00){
+          if (prices[arr_pos-2] > 0.00){
             lcd.setCursor(0, 1); 
             lcd.print(prices[arr_pos-2] -= 0.05);
             lcd.write(VAR_EURO);
@@ -415,8 +358,8 @@ void loop() {
 
         now_state_x = analogRead(X_AXIS);
 
-        Serial.println(now_state_x);
-
+        //Serial.println(now_state_x);
+        // calceling price I want to set and fix the initial one
         if (now_state_x < LEFT){
 
           prices[arr_pos-2] = initial_prices[arr_pos -2];
