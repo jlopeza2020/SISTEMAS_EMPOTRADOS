@@ -27,7 +27,7 @@ void show_products(){
     lcd.setCursor(0, 1); 
     lcd.print(prices[arr_pos]);
     // print €
-    lcd.write(3);
+    lcd.write(VAR_EURO);
 
     //manage joystick button
     unsigned int joy_button = digitalRead(SW_BUTTON);

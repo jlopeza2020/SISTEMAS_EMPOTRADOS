@@ -20,7 +20,7 @@ void callback_out_admin_mode(){
     Serial.println("out");    
     lcd.clear();
     digitalWrite(LED_PIN1, LOW);
-    analogWrite(LED_PIN2, 0);
+    analogWrite(LED_PIN2, LOW);
     admin_state = false;
     service_state = true;
     time3 = 0;

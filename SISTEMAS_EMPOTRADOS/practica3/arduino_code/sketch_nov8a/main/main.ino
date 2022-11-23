@@ -15,7 +15,7 @@
 
 // red led
 #define LED_PIN1 10
-// green
+// green led
 #define LED_PIN2 5 
 
 //ultrasonic sensor 
@@ -39,7 +39,18 @@
 #define LCD_COLS 16
 #define LCD_ROWS 2
 
+//values 
 #define SEC 1000
+
+// in miliseconds 
+#define THREE_HUNDRED_MS 300
+#define TWO_HUNDRED_FIFTY_MS 250
+#define VAR_EURO 3
+
+//in microseconds
+#define FIVE_HUNDRED_MS 500000
+#define ONE_SEC 1000000
+
 
 LiquidCrystal lcd(RS, ENABLE, D0, D1, D2, D3);
 DHT dht(DHT11_PIN, DHTTYPE);
@@ -104,11 +115,11 @@ void setup() {
 
   // make sure led is off
   digitalWrite(LED_PIN1, LOW);
-  analogWrite(LED_PIN2, 0);
+  analogWrite(LED_PIN2, LOW);
 
   //start interruption
   // 500 milis 
-  Timer1.initialize(500000);
+  Timer1.initialize(FIVE_HUNDRED_MS);
   Timer1.attachInterrupt(blinkLED);
 
   start_state = true;
@@ -117,34 +128,34 @@ void setup() {
 
   // distance thread
   distanceThread.enabled = true;
-  distanceThread.setInterval(300);
+  distanceThread.setInterval(THREE_HUNDRED_MS);
   distanceThread.onRun(callback_dist_thread);
 
   //shine led
   shine_led.enabled = true;
-  shine_led.setInterval(1000);
+  shine_led.setInterval(SEC);
   shine_led.onRun(callback_led_shine);
 
   //button_pressed
   button_pressed.enabled = true;
-  button_pressed.setInterval(250);
+  button_pressed.setInterval(TWO_HUNDRED_FIFTY_MS);
   button_pressed.onRun(callback_service_button);
 
   //in admin mode
   admin.enabled = true;
-  admin.setInterval(250);
+  admin.setInterval(TWO_HUNDRED_FIFTY_MS);
   admin.onRun(callback_admin_mode);
 
   //out admin mode 
   out_admin.enabled = true;
-  out_admin.setInterval(250);
+  out_admin.setInterval(TWO_HUNDRED_FIFTY_MS);
   out_admin.onRun(callback_out_admin_mode);
 
   
   Serial.begin(9600);
   dht.begin();
   // create custom € symbol
-  lcd.createChar(3, euro_symbol);
+  lcd.createChar(VAR_EURO, euro_symbol);
 
   //set random seed
   randomSeed(analogRead(A0));
@@ -161,7 +172,7 @@ void loop() {
       lcd.setCursor(3,0);
       lcd.print("CARGANDO...");
       digitalWrite(LED_PIN1, ledstate);
-    }else if (counter_led1 == 8 ){
+    }else if (counter_led1 == 8){
       // this interruption we won't use it again so I disable it
       detachInterrupt(digitalPinToInterrupt(LED_PIN1));
       lcd.clear();
@@ -178,7 +189,7 @@ void loop() {
 
   if(service_state){ // continous loop 
 
-    int distance_sensor = 0;
+    //int distance_sensor = 0;
     controller.add(&distanceThread);
 
     // b phase
@@ -189,7 +200,7 @@ void loop() {
 
       controller.remove(&distanceThread);
       //one second
-      Timer1.setPeriod(1000000);
+      Timer1.setPeriod(ONE_SEC);
       Timer1.attachInterrupt(show_t_h);
 
       if(counter_t_h <= 5){
@@ -272,13 +283,14 @@ void loop() {
   }
 
   if (admin_state){
-    
+
     controller.remove(&admin);
     controller.add(&out_admin);    
     digitalWrite(LED_PIN1, HIGH);
     analogWrite(LED_PIN2, 255);
 
     float hum = dht.readHumidity();
+
     // Read temperature as Celsius
     float temp = dht.readTemperature();
   
@@ -330,10 +342,9 @@ void loop() {
         lcd.print(coffees[arr_pos-2]);
         lcd.setCursor(0, 1); 
         lcd.print(prices[arr_pos-2]);
-        lcd.write(3);
+        lcd.write(VAR_EURO);
       }
 
-      //manage joystick button  fornew prices FIX
       unsigned int joy_button = digitalRead(SW_BUTTON);
       if (joy_button == 0){
 
@@ -343,45 +354,26 @@ void loop() {
 
       }
 
-      /*now_state_x = analogRead(X_AXIS);
-      if (now_state_x > 900){
-
-        lcd.clear();
-        digitalWrite(LED_PIN1, LOW);
-        analogWrite(LED_PIN2, 0);
-        admin_state = false;
-        service_state = true;
-
-      }*/
-      
       prev_time = millis();
     
     }
 
     if (changing_prices){
 
-
-      //unsigned int joy_button = digitalRead(SW_BUTTON);
-
       Serial.println("Im in");
       if ((millis() - prev_time) > 150){
         now_state_y = analogRead(Y_AXIS);
 
         if (now_state_y < 100){
-          //if (prices[arr_pos-2] >= 0.00){
           lcd.setCursor(0, 1); 
           lcd.print(prices[arr_pos-2] += 0.05);
-          lcd.write(3);
-          //lcd.clear();
-          //}
-
+          lcd.write(VAR_EURO);
         }
         if (now_state_y > 900){
           if (prices[arr_pos-2] >= 0.00){
             lcd.setCursor(0, 1); 
             lcd.print(prices[arr_pos-2] -= 0.05);
-            lcd.write(3);
-          //lcd.clear();
+            lcd.write(VAR_EURO);
           }
         }
 
@@ -404,14 +396,6 @@ void loop() {
 
         prev_time = millis();
 
-
-        //lcd.clear();
-        //digitalWrite(LED_PIN1, LOW);
-        //analogWrite(LED_PIN2, 0);
-        //admin_state = false;
-        //service_state = true;
-
-        
       }
 
 
@@ -419,7 +403,6 @@ void loop() {
 
   }
   
-  //}
   controller.run();  
 }
 
