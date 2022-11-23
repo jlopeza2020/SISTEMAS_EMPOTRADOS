@@ -392,7 +392,6 @@ void loop() {
     // after choosing a product to be changed 
     if (changing_prices){
 
-      //Serial.println("I am in");
       if ((millis() - prev_time) > ONE_HUNDRED_FIFTY_MS){
         
         now_state_y = analogRead(Y_AXIS);
