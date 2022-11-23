@@ -39,17 +39,48 @@
 #define LCD_COLS 16
 #define LCD_ROWS 2
 
-//values 
-#define SEC 1000
+//VALUES
+//#define SEC 1000
 
 // in miliseconds 
 #define THREE_HUNDRED_MS 300
 #define TWO_HUNDRED_FIFTY_MS 250
 #define VAR_EURO 3
+#define ONE_HUNDRED_FIFTY_MS 150
+#define FIVE_S2MS 5000
+#define TWO_S2MS 2000
+#define THREE_S2MS 3000
+#define SEC2MS 1000
 
 //in microseconds
 #define FIVE_HUNDRED_MS 500000
 #define ONE_SEC 1000000
+
+// SECONDS
+#define FIVE_S 5
+#define SIX_S 6
+// LED1 seconds
+#define MAX_LED1_S 8 
+#define MAX_START_S 11 
+
+// joystick axis
+// y axis
+#define UP 100
+#define DOWN 900
+// x axis
+#define LEFT 100
+
+// button (either joystick or the other)
+#define PRESSED 0
+
+//random values
+#define MIN_RND 4
+#define MAX_RND 9
+
+//ultrasonic sensor 
+#define MAX_DIST_PERSON 100
+#define MIN_DIST_PERSON 0
+
 
 
 LiquidCrystal lcd(RS, ENABLE, D0, D1, D2, D3);
@@ -113,12 +144,11 @@ void setup() {
 
   lcd.begin(LCD_COLS,LCD_ROWS);
 
-  // make sure led is off
+  // make sure leds are off
   digitalWrite(LED_PIN1, LOW);
   analogWrite(LED_PIN2, LOW);
 
-  //start interruption
-  // 500 milis 
+  //interruption 
   Timer1.initialize(FIVE_HUNDRED_MS);
   Timer1.attachInterrupt(blinkLED);
 
@@ -133,7 +163,7 @@ void setup() {
 
   //shine led
   shine_led.enabled = true;
-  shine_led.setInterval(SEC);
+  shine_led.setInterval(SEC2MS);
   shine_led.onRun(callback_led_shine);
 
   //button_pressed
@@ -167,17 +197,17 @@ void loop() {
   controller.add(&admin);
 
   if (start_state){
-    if(counter_led1 < 8){
+    if(counter_led1 < MAX_LED1_S){
       // for the lcd not move letters
       lcd.setCursor(3,0);
       lcd.print("CARGANDO...");
       digitalWrite(LED_PIN1, ledstate);
-    }else if (counter_led1 == 8){
+    }else if (counter_led1 == MAX_LED1_S){
       // this interruption we won't use it again so I disable it
       detachInterrupt(digitalPinToInterrupt(LED_PIN1));
       lcd.clear();
 
-    }else if (counter_led1 == 9 || counter_led1 == 10 || counter_led1 == 11 ){
+    }else if (counter_led1 >= MAX_LED1_S && counter_led1  <= MAX_START_S){
       lcd.setCursor(3,0);
       lcd.print("Servicio");
     }else{
@@ -203,10 +233,10 @@ void loop() {
       Timer1.setPeriod(ONE_SEC);
       Timer1.attachInterrupt(show_t_h);
 
-      if(counter_t_h <= 5){
+      if(counter_t_h <= FIVE_S){
  
         hum_temp();      
-      }else if(counter_t_h == 6){
+      }else if(counter_t_h == SIX_S){
         lcd.clear();
         prepare_coffee = false;
 
@@ -222,7 +252,7 @@ void loop() {
       
         if(phase_one){ 
                
-          if (millis() - lastTimeTemp > SEC){
+          if (millis() - lastTimeTemp > SEC2MS){
 
             lastTimeTemp = millis();
             count++;
@@ -239,7 +269,7 @@ void loop() {
 
           }else{
             lcd.clear();
-            analogWrite(LED_PIN2, 0);
+            analogWrite(LED_PIN2, LOW);
             controller.remove(&shine_led);
             phase_one = false;
             phase_two = true;
@@ -251,7 +281,7 @@ void loop() {
         if(phase_two){
         
 
-          if (millis() - lastTimeTemp > SEC){
+          if (millis() - lastTimeTemp > SEC2MS){
 
             lastTimeTemp = millis();
             count++;
@@ -294,17 +324,17 @@ void loop() {
     // Read temperature as Celsius
     float temp = dht.readTemperature();
   
-    if ((millis() - prev_time) > 150){
+    if ((millis() - prev_time) > ONE_HUNDRED_FIFTY_MS){
 
       now_state_y = analogRead(Y_AXIS);
 
-      if (now_state_y < 100){
+      if (now_state_y < UP){
         if(arr_pos > 0){
           arr_pos--;
           lcd.clear();
         }
       }
-      if (now_state_y > 900){
+      if (now_state_y > DOWN){
         if(arr_pos < 6){
           arr_pos++;
           lcd.clear();
@@ -346,7 +376,7 @@ void loop() {
       }
 
       unsigned int joy_button = digitalRead(SW_BUTTON);
-      if (joy_button == 0){
+      if (joy_button == PRESSED){
 
         lcd.setCursor(0, 0);
         lcd.print(coffees[arr_pos-2]);
@@ -361,15 +391,15 @@ void loop() {
     if (changing_prices){
 
       Serial.println("Im in");
-      if ((millis() - prev_time) > 150){
+      if ((millis() - prev_time) > ONE_HUNDRED_FIFTY_MS){
         now_state_y = analogRead(Y_AXIS);
 
-        if (now_state_y < 100){
+        if (now_state_y < UP){
           lcd.setCursor(0, 1); 
           lcd.print(prices[arr_pos-2] += 0.05);
           lcd.write(VAR_EURO);
         }
-        if (now_state_y > 900){
+        if (now_state_y > DOWN){
           if (prices[arr_pos-2] >= 0.00){
             lcd.setCursor(0, 1); 
             lcd.print(prices[arr_pos-2] -= 0.05);
@@ -378,7 +408,7 @@ void loop() {
         }
 
         unsigned int joy_button = digitalRead(SW_BUTTON);
-        if (joy_button == 0){
+        if (joy_button == PRESSED){
 
           changing_prices = false;
         }
@@ -387,7 +417,7 @@ void loop() {
 
         Serial.println(now_state_x);
 
-        if (now_state_x < 100){
+        if (now_state_x < LEFT){
 
           prices[arr_pos-2] = initial_prices[arr_pos -2];
           changing_prices = false;

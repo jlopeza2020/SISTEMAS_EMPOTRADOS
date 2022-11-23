@@ -5,17 +5,17 @@ void preparing_coffee(){
 
 void show_products(){
 
-  if ((millis() - prev_time) > 150){
+  if ((millis() - prev_time) > ONE_HUNDRED_FIFTY_MS){
 
     now_state_y = analogRead(Y_AXIS);
 
-    if (now_state_y < 100){
+    if (now_state_y < UP){
       if(arr_pos > 0){
         arr_pos--;
         lcd.clear();
       }
     }
-    if (now_state_y > 900){
+    if (now_state_y > DOWN){
       if(arr_pos < 4){
         arr_pos++;
         lcd.clear();
@@ -31,11 +31,11 @@ void show_products(){
 
     //manage joystick button
     unsigned int joy_button = digitalRead(SW_BUTTON);
-    if (joy_button == 0){
+    if (joy_button == PRESSED){
 
       lcd.clear();
-      //get random number between 4 to 9 
-      random_num = random(4,9);
+      //get random number between 4 to 8
+      random_num = random(MIN_RND,MAX_RND);
       prepare_coffee = true;
       phase_one= true;
     }
@@ -64,7 +64,7 @@ void hum_temp(){
   lcd.setCursor(0,0); 
   lcd.print("Temp: ");
   lcd.print(temp);
-  lcd.print((char)223);
+  //lcd.print((char)223);
   lcd.print("C");
   lcd.setCursor(0,1);
   lcd.print("Humedad: ");
