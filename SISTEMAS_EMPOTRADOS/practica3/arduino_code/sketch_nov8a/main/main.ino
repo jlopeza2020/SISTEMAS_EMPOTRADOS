@@ -89,7 +89,35 @@ byte euro_symbol[8] = {
   0b00110
 };
 
+/*oid distance_measure(){
 
+  lcd.print(get_distance());
+  lcd.print("cm");
+  
+}*/
+
+/*void callback_h_t(int posd){
+  float hum = dht.readHumidity();
+  // Read temperature as Celsius
+  float temp = dht.readTemperature();
+
+  // Check if any read failes
+  if (isnan(hum) || isnan(temp)) {
+    Serial.println(F("Failed reading from DHT sensor!"));
+    return;
+  }
+
+  //lcd.setCursor(0,0); 
+  lcd.print("Temp:");
+  lcd.print(int(temp));
+  //lcd.print((char)223);
+  lcd.print("C");
+  lcd.print(" ");
+  lcd.print("Hum:");
+  lcd.print(int(hum));
+  lcd.print("%");
+
+}*/
 void callback_admin_mode(){
 
   unsigned int button_state = digitalRead(BUTTON);
@@ -111,6 +139,20 @@ void callback_admin_mode(){
     start_state = false;
     service_state = false;
     lcd.clear();
+    counter_t_h = 0;
+    prepare_coffee = false;
+    phase_one = false;
+    count = 0;
+    phase_two = false;
+    lastTimeTemp = 0;
+    controller.remove(&distanceThread);
+    detachInterrupt(digitalPinToInterrupt(DHT11_PIN));
+    controller.remove(&shine_led);
+    analogWrite(LED_PIN2, 0);
+    detected_person = false;
+    controller.remove(&distanceThread);
+    time3 = 0;
+    controller.remove(&callback_button);
     admin_state = true;
   }
 }
@@ -131,7 +173,7 @@ void callback_button(){
 
   }
 
-  // rrestart service state 
+  // restart service state 
   if (time3 >= 2000 && time3 <= 3000){
     counter_t_h = 0;
     prepare_coffee = false;
@@ -205,7 +247,7 @@ void show_t_h(){
   counter_t_h++;
 }
 
-void callback_hum_dist_thread(){
+void hum_dist(){
   float hum = dht.readHumidity();
   // Read temperature as Celsius
   float temp = dht.readTemperature();
@@ -295,9 +337,9 @@ void setup() {
   distanceThread.onRun(callback_dist_thread);
 
   //hum thread use in admin mode 
-  hum_tempThread.enabled = true;
-  hum_tempThread.setInterval(250);
-  hum_tempThread.onRun(callback_hum_dist_thread);
+  //hum_tempThread.enabled = true;
+  //hum_tempThread.setInterval(250);
+  //hum_tempThread.onRun(callback_h_t);
 
   //shine led
   shine_led.enabled = true;
@@ -369,7 +411,7 @@ void loop() {
 
       if(counter_t_h <= 5){
  
-        callback_hum_dist_thread();      
+        hum_dist();      
       }else if(counter_t_h == 6){
         lcd.clear();
         prepare_coffee = false;
@@ -445,10 +487,88 @@ void loop() {
     }
 
   }
-  
+
   if (admin_state){
     digitalWrite(LED_PIN1, HIGH);
     analogWrite(LED_PIN2, 255);
+
+    float hum = dht.readHumidity();
+    // Read temperature as Celsius
+    float temp = dht.readTemperature();
+  
+    if ((millis() - prev_time) > 150){
+
+      now_state_y = analogRead(Y_AXIS);
+
+      if (now_state_y < 100){
+        if(arr_pos > 0){
+          arr_pos--;
+          lcd.clear();
+        }
+      }
+      if (now_state_y > 900){
+        if(arr_pos < 6){
+          arr_pos++;
+          lcd.clear();
+        }
+      }
+      //controller.add(&hum_tempThread);
+      if(arr_pos == 0){
+
+        lcd.setCursor(0, 0);
+        lcd.print("Temp:");
+        lcd.print(int(temp));
+        //lcd.print((char)223);
+        lcd.print("C");
+        lcd.print(" ");
+        lcd.print("Hum:");
+        lcd.print(int(hum));
+        lcd.print("%");
+
+        lcd.setCursor(0, 1);
+        lcd.print("Distancia: ");
+        lcd.print(get_distance());
+        lcd.print("cm");
+
+      }else if (arr_pos == 1){
+
+        lcd.setCursor(0, 0);
+        lcd.print("Distancia: ");
+        lcd.print(get_distance());
+        lcd.print("cm");
+
+        lcd.setCursor(0, 1);
+        lcd.print(millis()/1000);
+        lcd.print("s");
+      }else{
+        lcd.setCursor(0, 0);
+        lcd.print(coffees[arr_pos -2]);
+        lcd.setCursor(0, 1); 
+        lcd.print(prices[arr_pos-2]);
+      }
+
+      //manage joystick button  fornew prices FIX
+      unsigned int joy_button = digitalRead(SW_BUTTON);
+      if (joy_button == 0){
+
+        lcd.clear();
+        //get random number between 4 to 9 
+        
+        //random_num = random(4,9);
+        //prepare_coffee = true;
+        //phase_one= true;
+        digitalWrite(LED_PIN1, LOW);
+        analogWrite(LED_PIN2, 0);
+        admin_state = false;
+        service_state = true;
+        
+      }
+  
+      prev_time = millis();
+
+    }
+
+    
     //hacer lista
   }
 
