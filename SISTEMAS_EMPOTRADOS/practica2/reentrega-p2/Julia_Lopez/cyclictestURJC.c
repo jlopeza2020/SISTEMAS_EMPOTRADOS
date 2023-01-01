@@ -204,12 +204,12 @@ void *latency_calculation(void *ptr){
     int id_thread;
     id_thread = values->id;
 
-    dif.tv_sec = 0;
+    /*dif.tv_sec = 0;
     dif.tv_nsec = 0;
     counter = 0;
     total_latency = 0;
     media_latency = 0;
-    max_latency  = 0;
+    max_latency  = 0;*/
 
     if (clock_gettime(CLOCK_MONOTONIC, &begin) != 0){
         perror("error in clock get time");
@@ -361,7 +361,7 @@ int main(int argc, char *argv[]){
 
     for (i = 0; i < num_cores; i++) {
 
-        process_options(thread[i]);
+        //process_options(thread[i]);
         //sprintf(num_output, "[%d]", i);
         //for (j = 0; j < MAX_NUM_OUTPUT; j++){
             // assign one struct for each thread 
@@ -376,7 +376,7 @@ int main(int argc, char *argv[]){
             close(latency_target_fd);
             exit(FAILURE);
         }
-        //process_options(thread[i]);
+        process_options(thread[i]);
     }
 
     for (i = 0; i < num_cores; i++) {
@@ -451,9 +451,9 @@ int main(int argc, char *argv[]){
         // Export current thread information to a .csv file
         export_to_csv(threads_latency_values[core_id]);
     }
-
+    //FIX
     printf("\nTotal\tlatencia media = %09ld ns. | max = %09ld ns\n",
-    total_avg_lat/num_cores, total_max_lat);
+    total_avg_lat/6, total_max_lat);
 
     //close(csv_fd);
     close(latency_target_fd);
