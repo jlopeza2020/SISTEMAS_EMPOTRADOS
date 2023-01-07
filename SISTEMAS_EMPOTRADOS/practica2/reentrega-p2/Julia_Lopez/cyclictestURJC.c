@@ -41,7 +41,7 @@
 #define MAX_TIME 60 // in seconds
 //#define SLEEP_TIME 5000000 // in nanoseconds (5000000ns = 5 ms)
 #define S2NS 1000000000
-#define READS_PER_SECOND 250 // in lab pc
+//#define READS_PER_SECOND 250 // in lab pc
 
 struct latency_values{
 
@@ -193,9 +193,8 @@ void *latency_calculation(void *ptr){
     // number of measures
     int counter;
     long int total_latency;
-    long int latency;
+    //long int latency;
     long int max_latency;
-    //long int dif_latency;
     long int media_latency;
 
     struct latency_values *values;
@@ -208,8 +207,8 @@ void *latency_calculation(void *ptr){
     dif.tv_nsec = 0;
     counter = 0;
     total_latency = 0;
-    media_latency = 0;
-    max_latency  = 0;*/
+    media_latency = 0;*/
+    max_latency  = 0;
 
     if (clock_gettime(CLOCK_MONOTONIC, &begin) != 0){
         perror("error in clock get time");
@@ -224,6 +223,11 @@ void *latency_calculation(void *ptr){
     }
 
     dif.tv_sec = end.tv_sec - begin.tv_sec;
+    counter = 0;
+    total_latency = 0;
+    max_latency  = 0;
+
+
 
 
     while(dif.tv_sec <= MAX_TIME){
@@ -237,25 +241,28 @@ void *latency_calculation(void *ptr){
         // CALCULATE LATENCY
 
         if (clock_gettime(CLOCK_MONOTONIC, &lat_begin) != 0){
-            warnx("clock_gettime() failed. %s\n",strerror(errno));
-            exit(1);
+            perror("error in clock get time");
+            close(latency_target_fd);
+            exit(EXIT_FAILURE);
         }   
 
         //milis
         if (nanosleep((const struct timespec[]) {{SECONDS, SLEEP}}, NULL) < 0){
             perror("error in nanosleep");
+            close(latency_target_fd);
             exit(EXIT_FAILURE);
         }
 
         // Done sleeping. Task starts executing
         if (clock_gettime(CLOCK_MONOTONIC, &lat_end) != 0){
-            warnx("clock_gettime() failed. %s\n",strerror(errno));
-            exit(1);
+            perror("error in clock get time");
+            close(latency_target_fd);
+            exit(EXIT_FAILURE);
         }
 
         // Latency is the time from the end of sleep()
         // until the next line of code (clock_gettime()) is executed
-        latency = (lat_end.tv_nsec - lat_begin.tv_nsec) + (lat_end.tv_sec- lat_begin.tv_sec)*S2NS - SLEEP;
+        long int latency = (lat_end.tv_nsec - lat_begin.tv_nsec) + (lat_end.tv_sec- lat_begin.tv_sec)*S2NS - SLEEP;
 
         
         total_latency += latency;
@@ -294,6 +301,7 @@ void *latency_calculation(void *ptr){
     media_latency = total_latency / counter;
 
     printf("%d  latencia media = %.9ld ns. | max = %.9ld ns \n", id_thread, media_latency, max_latency);
+    printf("hola");
     values->media_latency = media_latency;
     values->max_latency = max_latency;
     values->total_latency = total_latency;
@@ -334,24 +342,20 @@ void config_min_latency(){
 int main(int argc, char *argv[]){
 
     int num_cores = (int) sysconf(_SC_NPROCESSORS_ONLN);
+
     DEBUG_PRINTF("N CORES %d\n",num_cores);
 
     pthread_t thread[num_cores];
     struct latency_values threads_latency_values[num_cores];
 
-    //char num_output[MAX_NUM_OUTPUT]; 
-    //char iters[MAX_NUM_OUTPUT];
-    //char latencies[LONG_SIZE];
-    int i, core_id;
+    int i; // core_id;
 
     //long int media_latency;
-    //long int final_media_latency;
     //long int max_latency;
-    //long int final_max_latency;
-    long int total_max_lat;
-    long int total_avg_lat;
 
-    //int csv_fd;
+
+    ////long int total_max_lat;
+    ////long int total_avg_lat;
 
 
     //media_latency = 0;
@@ -361,14 +365,8 @@ int main(int argc, char *argv[]){
 
     for (i = 0; i < num_cores; i++) {
 
-        //process_options(thread[i]);
-        //sprintf(num_output, "[%d]", i);
-        //for (j = 0; j < MAX_NUM_OUTPUT; j++){
-            // assign one struct for each thread 
-        //threads_latency_values[i].msgs[j] = num_output[j];
-        //}
+        
         threads_latency_values[i].id = i;
-        //memset(&num_output, '\0', sizeof(num_output));
 
         if (pthread_create(&thread[i], NULL, latency_calculation, 
             (void*) &threads_latency_values[i]) != 0){
@@ -389,7 +387,8 @@ int main(int argc, char *argv[]){
 
 
     //create_csv
-    create_csv();
+
+    ////create_csv();
 
     // calculate and print AVG and max for all threads together 
     
@@ -438,6 +437,8 @@ int main(int argc, char *argv[]){
         }
     }*/
     // Calculate and print Avg and Max latencies of all threads together.
+    ///////////////////////
+    /*
     for (core_id = 0; core_id < num_cores; core_id++){
         long int avg_lat = threads_latency_values[core_id].media_latency;
         long int max_lat =  threads_latency_values[core_id].max_latency;
@@ -453,15 +454,16 @@ int main(int argc, char *argv[]){
     }
     //FIX
     printf("\nTotal\tlatencia media = %09ld ns. | max = %09ld ns\n",
-    total_avg_lat/6, total_max_lat);
+    total_avg_lat/num_cores, total_max_lat);
+    */
 
     //close(csv_fd);
     close(latency_target_fd);
 
-    DEBUG_PRINTF("ERRNO %d\n", errno);
-    if (errno != 0){
-        return FAILURE;
-    }else{
-        return SUCCESS;
-    }
+    //DEBUG_PRINTF("ERRNO %d\n", errno);
+    //if (errno != 0){
+    //    return FAILURE;
+    //}else{
+    return SUCCESS;
+    //}
 }
