@@ -18,15 +18,13 @@
 #define SUCCESS 0
 #define FAILURE 1
 #define PRIORITY 99
-#define SLEEP 3000000  // in nanoseconds (3000000ns = 3 ms)
+#define THREE_MS 3000000  // in nanoseconds (3000000ns = 3 ms)
 #define SECONDS 0
 #define MAX_LATENCIES 30000
-//#define LONG_SIZE 12
-
-#define MAX_TIME 60 // in seconds
+#define ONE_MIN 60 
 #define S2NS 1000000000
-//#define HEADING_SIZE 30
 
+// struct used to store info about each cpu
 struct latency_values{
 
     long int latencies[MAX_LATENCIES];
@@ -35,81 +33,39 @@ struct latency_values{
     long int max_latency;
     long int total_latency;
     int id;
-
 };
 
 int latency_target_fd;
 
+void fill_csv(struct latency_values thread_latency){
+    int num_cpu, i, num_measures;
+    long int latency;
+
+    num_cpu = thread_latency.id;
+    num_measures = thread_latency.counter;
+    FILE *csv_fd = fopen("cyclictestURJC.csv",  "a");
+    
+    for (i = 0; i < num_measures; i++){
+        latency = thread_latency.latencies[i];
+        // fprintf makes writing into 
+        // the file easier rather than write 
+        fprintf(csv_fd,"%d,%d,%ld\n",num_cpu,i,latency);
+    }
+    fclose(csv_fd);
+}
+
 void create_csv(){
 
-    //FILE *fpt;
-    //fpt = fopen("cyclictestURJC.csv",  "w+");
     int csv_fd = open("./cyclictestURJC.csv" , O_WRONLY | O_CREAT | O_TRUNC, 0666);
     char *heading = "CPU,NUMERO_ITERACION,LATENCIA\n";
-    //printf("%ld", strlen(heading));
     if (write(csv_fd,heading,strlen(heading)) != strlen(heading)){
         perror("Error in writing");
         close(latency_target_fd);
         close(csv_fd);
         exit(FAILURE);
-        
     }
 
     close(csv_fd);
-    //fprintf(fpt,"CPU,NUMERO_ITERACION,LATENCIA\n");
-    //fclose(fpt);
-}
-
-void fill_csv(struct latency_values thread_latency){
-    int num_cpu, i, num_measures;
-    long int latency;
-    num_cpu = thread_latency.id;
-    num_measures = thread_latency.counter;
-    FILE *csv_fd = fopen("cyclictestURJC.csv",  "a");
-    for (i = 0; i < num_measures; i++){
-        latency = thread_latency.latencies[i];
-        // makes writing into the file easier 
-        //rather than write 
-        fprintf(csv_fd,"%d,%d,%ld\n",num_cpu,i,latency);
-    }
-    fclose(csv_fd);
-
-    /*int num_cpu, i, measures;
-    long int latency;
-    num_cpu = thread_latency.id;
-    measures = thread_latency.counter;
-    //FILE *fpt;
-    //fpt = fopen("cyclictestURJC.csv",  "a");
-    int csv_fd = open("./cyclictestURJCC.csv" , O_WRONLY);
-    char cpu[2];
-    char iteration[10];
-    char lat[20];
-
-    for (i = 0; i < measures; i++){
-        latency = thread_latency.latencies[i];
-
-        //CPU
-        sprintf(cpu,"%d", num_cpu);
-        write(csv_fd,cpu,1);
-        //comma
-        write(csv_fd,",",1);
-        //NUMERO_ITERACION
-        sprintf(iteration,"%d", i);
-        write(csv_fd,iteration,10);
-        //comma
-        write(csv_fd,",",1);
-        //LATENCIA
-        sprintf(lat,"%ld", latency);
-        write(csv_fd,lat, 20);
-        //\n
-        write(csv_fd,"\n",2);
-
-
-        //fprintf(fpt,"%d,%d,%ld\n",num_cpu,i,latency);
-    }
-    //fclose(fpt);
-    close(csv_fd);*/
-    
 }
 
 void process_options(pthread_t thread){
@@ -146,21 +102,13 @@ void process_options(pthread_t thread){
 
 void *latency_calculation(void *ptr){
 
-    struct timespec begin;
-    struct timespec end;
-    struct timespec dif;
-    struct timespec l_begin;
-    struct timespec l_end;
+    struct timespec begin, end, dif, l_begin, l_end;
     // number of measures
     int counter;
-    long int total_latency;
-    long int max_latency;
-    long int media_latency;
+    long int total_latency, max_latency, media_latency;
 
-    struct latency_values *values;
-    values = (struct latency_values *) ptr;
-    int id_thread;
-    id_thread = values->id;
+    struct latency_values *values = (struct latency_values *) ptr;
+    int id_thread = values->id;
 
     counter = 0;
     total_latency = 0;
@@ -180,7 +128,7 @@ void *latency_calculation(void *ptr){
 
     dif.tv_sec = end.tv_sec - begin.tv_sec;
   
-    while(dif.tv_sec <= MAX_TIME){
+    while(dif.tv_sec <= ONE_MIN){
 
         if (clock_gettime(CLOCK_MONOTONIC, &end) != 0){
             perror("error in clock get time");
@@ -197,7 +145,7 @@ void *latency_calculation(void *ptr){
         }   
 
         //make the sleep in nano seconds
-        if (nanosleep((const struct timespec[]) {{SECONDS, SLEEP}}, NULL) < 0){
+        if (nanosleep((const struct timespec[]) {{SECONDS, THREE_MS}}, NULL) < 0){
             perror("error in nanosleep");
             close(latency_target_fd);
             exit(EXIT_FAILURE);
@@ -209,10 +157,10 @@ void *latency_calculation(void *ptr){
             exit(EXIT_FAILURE);
         }
 
-        // latency calculation in ns
-        long int latency = (l_end.tv_nsec - l_begin.tv_nsec) + (l_end.tv_sec - l_begin.tv_sec)*S2NS - SLEEP;
+        long int total_ns = (l_end.tv_nsec - l_begin.tv_nsec) + (l_end.tv_sec - l_begin.tv_sec)*S2NS;
+        // latency calculation in ns (ns - sleeep time)
+        long int latency = total_ns - THREE_MS;
 
-        
         total_latency += latency;
 
         if (latency > max_latency){
@@ -227,12 +175,12 @@ void *latency_calculation(void *ptr){
 
         // increments num of iteration
         counter++;
-
     }
 
     media_latency = total_latency / counter;
 
-    printf("[%d]\tlatencia media = %.9ld ns. | max = %.9ld ns \n", id_thread, media_latency, max_latency);
+    printf("[%d]\tlatencia media = %.9ld ns. | max = %.9ld ns \n",
+    id_thread, media_latency, max_latency);
 
     values->media_latency = media_latency;
     values->max_latency = max_latency;
@@ -313,7 +261,7 @@ int main(int argc, char *argv[]){
             total_max = max_thread;
         }
 
-        // export thread info into csv 
+        // export thread info into cyclictestURJC.csv 
         fill_csv(threads_latency_values[i]);
     }
 
