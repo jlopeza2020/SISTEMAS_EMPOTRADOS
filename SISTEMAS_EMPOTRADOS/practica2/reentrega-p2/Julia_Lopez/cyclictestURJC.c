@@ -35,7 +35,7 @@ struct latency_values{
     int id;
 };
 
-int latency_target_fd;
+//int latency_target_fd;
 
 void fill_csv(struct latency_values thread_latency){
     int num_cpu, i, num_measures;
@@ -60,7 +60,7 @@ void create_csv(){
     char *heading = "CPU,NUMERO_ITERACION,LATENCIA\n";
     if (write(csv_fd,heading,strlen(heading)) != strlen(heading)){
         perror("Error in writing");
-        close(latency_target_fd);
+        //close(latency_target_fd);
         close(csv_fd);
         exit(FAILURE);
     }
@@ -68,14 +68,14 @@ void create_csv(){
     close(csv_fd);
 }
 
-void process_options(pthread_t thread){
+void process_options(pthread_t thread, int id){
 
     int policy = SCHED_FIFO;
     struct sched_param param;
     cpu_set_t cpuset;
-    int i, config, dif_core;
+    int config, dif_core;
 
-    i = 0;
+    //i = 0;
 
     // prepare thread configuration
     param.sched_priority = PRIORITY;
@@ -84,17 +84,17 @@ void process_options(pthread_t thread){
     config = pthread_setschedparam(thread, policy, &param);
     if (config != 0){
         perror("Error in pthread_setschedparam");
-        close(latency_target_fd);
+        //close(latency_target_fd);
         exit(FAILURE);
     }
 
     CPU_ZERO(&cpuset);
-    CPU_SET(i, &cpuset);
+    CPU_SET(id, &cpuset);
 
     dif_core = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
     if (dif_core != 0){
         perror("Error in pthread_setaffinity_np");
-        close(latency_target_fd);
+        //close(latency_target_fd);
         exit(FAILURE);
     }
 
@@ -116,13 +116,13 @@ void *latency_calculation(void *ptr){
 
     if (clock_gettime(CLOCK_MONOTONIC, &begin) != 0){
         perror("error in clock get time");
-        close(latency_target_fd);
+        //close(latency_target_fd);
         exit(EXIT_FAILURE);
     }
 
     if (clock_gettime(CLOCK_MONOTONIC, &end) != 0){
         perror("error in clock get time");
-        close(latency_target_fd);
+        //close(latency_target_fd);
         exit(EXIT_FAILURE);
     }
 
@@ -132,7 +132,7 @@ void *latency_calculation(void *ptr){
 
         if (clock_gettime(CLOCK_MONOTONIC, &end) != 0){
             perror("error in clock get time");
-            close(latency_target_fd);
+            //close(latency_target_fd);
             exit(EXIT_FAILURE);
         } 
 
@@ -140,20 +140,20 @@ void *latency_calculation(void *ptr){
         
         if (clock_gettime(CLOCK_MONOTONIC, &l_begin) != 0){
             perror("error in clock get time");
-            close(latency_target_fd);
+            //close(latency_target_fd);
             exit(EXIT_FAILURE);
         }   
 
         //make the sleep in nano seconds
         if (nanosleep((const struct timespec[]) {{SECONDS, THREE_MS}}, NULL) < 0){
             perror("error in nanosleep");
-            close(latency_target_fd);
+            //close(latency_target_fd);
             exit(EXIT_FAILURE);
         }
 
         if (clock_gettime(CLOCK_MONOTONIC, &l_end) != 0){
             perror("error in clock get time");
-            close(latency_target_fd);
+            //close(latency_target_fd);
             exit(EXIT_FAILURE);
         }
 
@@ -195,7 +195,7 @@ void config_min_latency(){
 
     static int32_t latency_target_value = 0;
 
-	latency_target_fd = open("/dev/cpu_dma_latency", O_RDWR);
+	int latency_target_fd = open("/dev/cpu_dma_latency", O_RDWR);
     if(latency_target_fd < 0){
         perror("error in open");
         close(latency_target_fd);
@@ -211,10 +211,8 @@ void config_min_latency(){
 
 int main(int argc, char *argv[]){
 
+    //config_min_latency();
     int num_cores = (int) sysconf(_SC_NPROCESSORS_ONLN);
-
-    DEBUG_PRINTF("N CORES %d\n",num_cores);
-
     pthread_t thread[num_cores];
     struct latency_values threads_latency_values[num_cores];
 
@@ -233,16 +231,16 @@ int main(int argc, char *argv[]){
         if (pthread_create(&thread[i], NULL, latency_calculation, 
             (void*) &threads_latency_values[i]) != 0){
             perror("error creating thread");
-            close(latency_target_fd);
+            //close(latency_target_fd);
             exit(FAILURE);
         }
-        process_options(thread[i]);
+        process_options(thread[i], i);
     }
 
     for (i = 0; i < num_cores; i++) {
         if (pthread_join(thread[i], NULL) != 0){
             perror("error joining thread");
-            close(latency_target_fd);
+            //close(latency_target_fd);
             exit(FAILURE);
         }
     }
@@ -271,7 +269,7 @@ int main(int argc, char *argv[]){
     printf("Total\tlatencia media = %09ld ns. | max = %09ld ns\n",
     total_media, total_max);
 
-    close(latency_target_fd);
+    //close(latency_target_fd);
 
     return SUCCESS;
 }
